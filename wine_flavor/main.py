@@ -1,8 +1,7 @@
 
 import datasource
-import debugs
 import engine
-import pandas as pd
+import pretty_print
 import transforms
 
 SIE_BASE_URL = "http://localhost:8080"
@@ -42,35 +41,8 @@ wine_matrix = engine.build_wine_matrix(wines, unique_flavors, flavor_idf)
 user_vector = engine.build_user_vector(user_preferences, unique_flavors, flavor_idf)
 top_matches = engine.cosine_similarity_search(user_vector, wine_matrix, top_k=COSINE_TOP_K)
 
-print("=== USER VECTOR ===")
-print(f"acidity: {user_vector[0]:.3f}")
-print(f"fizziness: {user_vector[1]:.3f}")
-print(f"intensity: {user_vector[2]:.3f}")
-print(f"sweetness: {user_vector[3]:.3f}")
-print(f"tannin: {user_vector[4]:.3f}")
-print("flavor weights:")
-for flavor_name, flavor_weight in sorted(user_preferences["flavors"].items(), key=lambda item: item[1], reverse=True):
-    print(f"  {flavor_name}: {flavor_weight}")
-print(f"vector length: {len(user_vector)}")
-print()
-
-sample_wine_row = wines.iloc[0]
-sample_wine_vector = engine.build_wine_vector(sample_wine_row, unique_flavors, flavor_idf)
-
-print("=== SAMPLE WINE VECTOR ===")
-print(f"wine: {sample_wine_row['wine_name']}")
-print(f"acidity: {sample_wine_vector[0]:.3f}")
-print(f"fizziness: {sample_wine_vector[1]:.3f}")
-print(f"intensity: {sample_wine_vector[2]:.3f}")
-print(f"sweetness: {sample_wine_vector[3]:.3f}")
-print(f"tannin: {sample_wine_vector[4]:.3f}")
-print("active flavors:")
-for flavor_name, flavor_weight in zip(unique_flavors, sample_wine_vector[5:]):
-    if flavor_weight > 0:
-        print(f"  {flavor_name}: {flavor_weight:.4f}")
-print(f"review count: {sample_wine_row['review_count']}")
-print(f"vector length: {len(sample_wine_vector)}")
-print()
+# pretty_print.print_user_vector(user_preferences, user_vector)
+# pretty_print.print_wine_vector(wines, unique_flavors, flavor_idf)
 
 reranked_matches = engine.rerank_wines_with_sie_reviews(
     wines,
@@ -82,42 +54,14 @@ reranked_matches = engine.rerank_wines_with_sie_reviews(
     base_url=SIE_BASE_URL,
     model_name=SIE_RERANK_MODEL,
 )
-match_frame = pd.DataFrame(reranked_matches)
-sort_columns = ["rerank_rank", "rerank_score"]
-ascending = [True, False]
-rerank_status = "enabled"
+top_results = pretty_print.build_results_frame(wines, reranked_matches)
 
-top5 = match_frame.merge(
-    wines.reset_index().rename(columns={"index": "row_index"})[
-        [
-            "row_index",
-            "wine_id",
-            "wine_name",
-            "winery_name",
-            "vintage_year",
-            "rating_average",
-            "country_name",
-            "region_name",
-            "price_amount",
-            "price_currency",
-            "review_count",
-        ]
-    ],
-    on="row_index",
-    how="left",
-).sort_values(sort_columns, ascending=ascending)
-
-# debugs.print_wine_flavors(wines)
-# print(wines.head())
-# print(wines.shape)
-# print(wines.columns)
-
-print(f"Flavor vocabulary size: {len(unique_flavors)}")
-print(f"Wine matrix shape: {wine_matrix.shape}")
-print(f"User vector length: {len(user_vector)}")
-print(f"Cosine top-k: {COSINE_TOP_K}")
-print(f"Reviews per wine: {REVIEWS_PER_WINE}")
-print(f"Rerank max terms: {RERANK_MAX_TERMS}")
-print(f"SIE rerank status: {rerank_status}")
-print("\n--- Top 5 Wine Recommendations (review rerank) ---")
-print(top5.to_string(index=False))
+# pretty_print.print_run_config(
+#     unique_flavors,
+#     wine_matrix,
+#     user_vector,
+#     COSINE_TOP_K,
+#     REVIEWS_PER_WINE,
+#     RERANK_MAX_TERMS,
+# )
+pretty_print.print_top_results(top_results)
