@@ -39,17 +39,17 @@ python main.py
 
 [`main.py`](/home/alex/code/pp/WineRetrieval/wine_flavor/main.py) is the main hub of operations.
 
-It does five things:
+It does six things:
 
 1. Fetches wines from Vivino with `datasource.fetch_vivino_wines(...)`.
-2. Builds the shared flavor vocabulary with `transforms.unique_flavors(...)`.
-3. Defines the editable `user_preferences` dictionary.
-4. Builds the wine matrix and user vector through `engine`.
-5. Runs retrieval and optional SIE reranking, then prints the top matches.
+2. Fetches English reviews for those wines with `datasource.attach_vivino_reviews(...)`.
+3. Builds the shared flavor vocabulary with `transforms.unique_flavors(...)`.
+4. Defines the editable `user_preferences` dictionary.
+5. Builds the wine matrix and user vector through `engine`.
+6. Runs cosine candidate retrieval, then review-based SIE reranking, then prints the top matches.
 
 The main things you will edit in [`main.py`](/home/alex/code/pp/WineRetrieval/wine_flavor/main.py) are:
 
-- `USE_SIE_RERANK`
 - `SIE_BASE_URL`
 - `SIE_RERANK_MODEL`
 - `user_preferences`
