@@ -51,6 +51,23 @@ for flavor_name, flavor_weight in sorted(user_preferences["flavors"].items(), ke
 print(f"vector length: {len(user_vector)}")
 print()
 
+sample_wine_row = wines.iloc[0]
+sample_wine_vector = engine.build_wine_vector(sample_wine_row, unique_flavors, flavor_idf)
+
+print("=== SAMPLE WINE VECTOR ===")
+print(f"wine: {sample_wine_row['wine_name']}")
+print(f"acidity: {sample_wine_vector[0]:.3f}")
+print(f"fizziness: {sample_wine_vector[1]:.3f}")
+print(f"intensity: {sample_wine_vector[2]:.3f}")
+print(f"sweetness: {sample_wine_vector[3]:.3f}")
+print(f"tannin: {sample_wine_vector[4]:.3f}")
+print("active flavors:")
+for flavor_name, flavor_weight in zip(unique_flavors, sample_wine_vector[5:]):
+    if flavor_weight > 0:
+        print(f"  {flavor_name}: {flavor_weight:.4f}")
+print(f"vector length: {len(sample_wine_vector)}")
+print()
+
 if USE_SIE_RERANK:
     reranked_matches = engine.rerank_wines_with_sie(
         wines,

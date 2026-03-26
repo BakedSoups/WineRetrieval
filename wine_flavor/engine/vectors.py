@@ -1,13 +1,19 @@
 import numpy as np
+import pandas as pd
 
 
 def pull_structure(wine_row):
+    def normalize_taste(value, default=2.5):
+        if pd.isna(value):
+            value = default
+        return float(value) / 5.0
+
     return np.array([
-        (wine_row.get("taste_acidity") or 2.5) / 5.0,
-        (wine_row.get("taste_fizziness") or 2.5) / 5.0,
-        (wine_row.get("taste_intensity") or 2.5) / 5.0,
-        (wine_row.get("taste_sweetness") or 2.5) / 5.0,
-        (wine_row.get("taste_tannin") or 2.5) / 5.0,
+        normalize_taste(wine_row.get("taste_acidity")),
+        normalize_taste(wine_row.get("taste_fizziness")),
+        normalize_taste(wine_row.get("taste_intensity")),
+        normalize_taste(wine_row.get("taste_sweetness")),
+        normalize_taste(wine_row.get("taste_tannin")),
     ])
 
 
@@ -18,12 +24,16 @@ def pull_flavor_counts(wine_row):
         for keyword in flavor_group.get("primary_keywords") or []:
             flavor_name = keyword.get("name")
             flavor_count = keyword.get("count", 1)
+            if pd.isna(flavor_count):
+                flavor_count = 1
             if flavor_name:
                 flavor_counts[flavor_name] = flavor_counts.get(flavor_name, 0) + flavor_count
 
         for keyword in flavor_group.get("secondary_keywords") or []:
             flavor_name = keyword.get("name")
             flavor_count = keyword.get("count", 1)
+            if pd.isna(flavor_count):
+                flavor_count = 1
             if flavor_name and flavor_name not in flavor_counts:
                 flavor_counts[flavor_name] = flavor_counts.get(flavor_name, 0) + flavor_count
 
