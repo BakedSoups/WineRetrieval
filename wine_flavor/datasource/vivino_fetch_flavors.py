@@ -2,6 +2,7 @@ import numpy as np
 import requests
 import pandas as pd
 
+
 # grabs a list of wines 
 def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_pages=1, country_code=None, wine_type_ids=None, min_rating=None):
     url = "https://www.vivino.com/api/explore/explore"
@@ -60,12 +61,12 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
                     "group": flavor_group.get("group"),
                     "count": stats.get("count"),
                     "primary_keywords": [
-                        {"name": kw.get("name"), "count": kw.get("count")}
-                        for kw in (flavor_group.get("primary_keywords") or [])
+                        {"name": key_word.get("name"), "count": key_word.get("count")}
+                        for key_word in (flavor_group.get("primary_keywords") or [])
                     ],
                     "secondary_keywords": [
-                        {"name": kw.get("name"), "count": kw.get("count")}
-                        for kw in (flavor_group.get("secondary_keywords") or [])
+                        {"name": key_word.get("name"), "count": key_word.get("count")}
+                        for key_word in (flavor_group.get("secondary_keywords") or [])
                     ]
                 })
 
