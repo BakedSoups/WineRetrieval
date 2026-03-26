@@ -1,4 +1,4 @@
-from .vivino.vivino_fetch_flavors import fetch_vivino_wines
+from .vivino.vivino_fetch_flavors import fetch_vivino_wines, get_vivino_wine_ids, print_vivino_wine_ids
 
 
-# all data packages for data sources MUST return a pandas data frame only 
+# data source packages should expose raw-fetch helpers only

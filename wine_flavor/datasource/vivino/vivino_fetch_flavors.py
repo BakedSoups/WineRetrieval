@@ -1,9 +1,8 @@
-import numpy as np
 import requests
 import pandas as pd
 
 
-# grabs a list of wines 
+# grabs a list of wines
 def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_pages=1, country_code=None, wine_type_ids=None, min_rating=None):
     url = "https://www.vivino.com/api/explore/explore"
     all_wines = []
@@ -19,7 +18,7 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
             "price_range_max": price_range_max,
             "price_range_min": price_range_min,
         }
-        
+
         if country_code:
             params["country_code"] = country_code
         if wine_type_ids:
@@ -42,7 +41,7 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
             vintage = item.get("vintage", {})
             wine = vintage.get("wine", {})
             winery = wine.get("winery", {})
-            stats = vintage.get("statistics", {})
+            vintage_stats = vintage.get("statistics", {})
             region = wine.get("region", {})
             country = region.get("country", {})
             taste = wine.get("taste") or {}
@@ -51,22 +50,22 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
             price = item.get("price", {})
             currency = price.get("currency", {})
 
-            food_pairings = [f.get("name") for f in (style.get("foods") or [])]
-            grapes_composition = [g.get("name") for g in (style.get("grapes") or [])]
+            food_pairings = [food.get("name") for food in (style.get("foods") or [])]
+            grapes_composition = [grape.get("name") for grape in (style.get("grapes") or [])]
 
             wine_flavors = []
             for flavor_group in (taste.get("flavor") or []):
-                stats = flavor_group.get("stats", {})
+                flavor_stats = flavor_group.get("stats", {})
                 wine_flavors.append({
                     "group": flavor_group.get("group"),
-                    "count": stats.get("count"),
+                    "count": flavor_stats.get("count"),
                     "primary_keywords": [
-                        {"name": key_word.get("name"), "count": key_word.get("count")}
-                        for key_word in (flavor_group.get("primary_keywords") or [])
+                        {"name": keyword.get("name"), "count": keyword.get("count")}
+                        for keyword in (flavor_group.get("primary_keywords") or [])
                     ],
                     "secondary_keywords": [
-                        {"name": key_word.get("name"), "count": key_word.get("count")}
-                        for key_word in (flavor_group.get("secondary_keywords") or [])
+                        {"name": keyword.get("name"), "count": keyword.get("count")}
+                        for keyword in (flavor_group.get("secondary_keywords") or [])
                     ]
                 })
 
@@ -75,8 +74,8 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
                 "winery_name": winery.get("seo_name"),
                 "wine_name": wine.get("seo_name"),
                 "vintage_year": vintage.get("year"),
-                "rating_average": stats.get("ratings_average"),
-                "ratings_count": stats.get("ratings_count"),
+                "rating_average": vintage_stats.get("ratings_average"),
+                "ratings_count": vintage_stats.get("ratings_count"),
                 "country_name": country.get("name"),
                 "region_name": region.get("name"),
                 "is_natural": wine.get("is_natural"),
@@ -100,3 +99,34 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
             })
 
     return pd.DataFrame(all_wines)
+
+
+def get_vivino_wine_ids(price_range_min=0, price_range_max=1000, page=1, num_pages=1, country_code=None, wine_type_ids=None, min_rating=None, limit=None):
+    wines = fetch_vivino_wines(
+        price_range_min=price_range_min,
+        price_range_max=price_range_max,
+        page=page,
+        num_pages=num_pages,
+        country_code=country_code,
+        wine_type_ids=wine_type_ids,
+        min_rating=min_rating,
+    )
+    wine_ids = wines["wine_id"].dropna().astype(int).tolist()
+    if limit is not None:
+        return wine_ids[:limit]
+    return wine_ids
+
+
+def print_vivino_wine_ids(price_range_min=0, price_range_max=1000, page=1, num_pages=1, country_code=None, wine_type_ids=None, min_rating=None, limit=10):
+    wine_ids = get_vivino_wine_ids(
+        price_range_min=price_range_min,
+        price_range_max=price_range_max,
+        page=page,
+        num_pages=num_pages,
+        country_code=country_code,
+        wine_type_ids=wine_type_ids,
+        min_rating=min_rating,
+        limit=limit,
+    )
+    print(wine_ids)
+    return wine_ids
