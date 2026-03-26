@@ -30,6 +30,30 @@ def pull_flavor_counts(wine_row):
     return flavor_counts
 
 
+def build_flavor_document_frequency(wines):
+    document_frequency = {}
+
+    for _, wine_row in wines.iterrows():
+        wine_flavors = pull_flavor_counts(wine_row)
+        for flavor_name in wine_flavors:
+            document_frequency[flavor_name] = document_frequency.get(flavor_name, 0) + 1
+
+    return document_frequency
+
+
+def build_flavor_idf(wines):
+    total_wines = len(wines)
+    if total_wines == 0:
+        return {}
+
+    document_frequency = build_flavor_document_frequency(wines)
+    return {
+        flavor_name: np.log(total_wines / doc_count)
+        for flavor_name, doc_count in document_frequency.items()
+        if doc_count > 0
+    }
+
+
 def build_wine_vector(wine_row, all_flavors, flavor_idf=None):
     structure_vector = pull_structure(wine_row)
     flavor_vector = np.zeros(len(all_flavors))
