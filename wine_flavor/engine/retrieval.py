@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 
 from .vectors import build_wine_vector
 
@@ -19,13 +20,7 @@ def cosine_similarity_search(query_vector, wine_matrix, top_k=5):
     if wine_matrix.size == 0:
         return []
 
-    query_norm = np.linalg.norm(query_vector)
-    wine_norms = np.linalg.norm(wine_matrix, axis=1)
-
-    denominator = wine_norms * query_norm
-    denominator[denominator == 0] = 1.0
-
-    similarity_scores = wine_matrix @ query_vector / denominator
+    similarity_scores = cosine_similarity([query_vector], wine_matrix)[0]
     ranked_indices = np.argsort(similarity_scores)[::-1][:top_k]
 
     return [
