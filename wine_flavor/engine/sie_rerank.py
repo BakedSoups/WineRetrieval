@@ -19,6 +19,8 @@ def _resolve_sie_connection(base_url=None):
 
 
 def build_wine_rerank_text(wine_row):
+    from .vectors import pull_flavor_counts
+
     text_parts = []
 
     wine_name = wine_row.get("wine_name")
@@ -37,20 +39,11 @@ def build_wine_rerank_text(wine_row):
         location = ", ".join(str(part) for part in [region_name, country_name] if part and part != "None")
         text_parts.append(f"Origin: {location}")
 
-    flavor_names = []
-    for flavor_group in wine_row.get("wine_flavors", []):
-        for keyword in flavor_group.get("primary_keywords") or []:
-            flavor_name = keyword.get("name")
-            if flavor_name:
-                flavor_names.append(flavor_name)
-        for keyword in flavor_group.get("secondary_keywords") or []:
-            flavor_name = keyword.get("name")
-            if flavor_name:
-                flavor_names.append(flavor_name)
-
-    if flavor_names:
-        unique_flavors = list(dict.fromkeys(flavor_names))
-        text_parts.append(f"Tasting notes: {', '.join(unique_flavors)}")
+    flavor_counts = pull_flavor_counts(wine_row)
+    if flavor_counts:
+        weighted_flavors = sorted(flavor_counts.items(), key=lambda item: item[1], reverse=True)
+        flavor_summary = ", ".join(f"{flavor_name} ({flavor_weight:g})" for flavor_name, flavor_weight in weighted_flavors)
+        text_parts.append(f"Tasting notes: {flavor_summary}")
 
     structure_parts = []
     for label, value in [
