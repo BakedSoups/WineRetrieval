@@ -1,6 +1,8 @@
 import requests
 import pandas as pd
 
+REQUEST_TIMEOUT_S = 20
+
 
 # grabs a list of wines
 def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_pages=1, country_code=None, wine_type_ids=None, min_rating=None):
@@ -26,7 +28,7 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
         if min_rating:
             params["min_rating"] = min_rating
 
-        response = requests.get(url, params=params, headers=headers)
+        response = requests.get(url, params=params, headers=headers, timeout=REQUEST_TIMEOUT_S)
 
         if response.status_code != 200:
             print(f"Error: {response.status_code} on page {current_page}")

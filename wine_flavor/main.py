@@ -1,22 +1,57 @@
 
 import datasource
 import engine
+import os
 import pretty_print
+import requests
 import transforms
+from dotenv import load_dotenv
 
-SIE_BASE_URL = "http://localhost:8080"
+load_dotenv()
+
+SIE_BASE_URL = os.getenv("CLUSTER_URL")
+SIE_API_KEY = os.getenv("API_KEY")
 SIE_RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
 COSINE_TOP_K = 3
 REVIEWS_PER_WINE = 5
 RERANK_MAX_TERMS = 12
 
+
+def ensure_sie_available():
+    if not SIE_BASE_URL:
+        raise ValueError("Missing CLUSTER_URL in the environment.")
+    if not SIE_API_KEY:
+        raise ValueError("Missing API_KEY in the environment.")
+
+    try:
+        from sie_sdk import SIEClient
+    except ImportError as exc:
+        raise ImportError("sie_sdk is required to use SIE reranking.") from exc
+
+    try:
+        response = requests.get(
+            f"{SIE_BASE_URL.rstrip('/')}/healthz",
+            headers={"Authorization": f"Bearer {SIE_API_KEY}"},
+            timeout=10,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        raise RuntimeError(f"Could not connect to SIE at {SIE_BASE_URL}. Check CLUSTER_URL, API_KEY, and cluster status.") from exc
+
+
+print("Checking SIE connection...", flush=True)
+ensure_sie_available()
+
 # If you need a broader batch later, uncomment this to print back some IDs.
 # datasource.print_vivino_wine_ids(num_pages=3, limit=10)
 
+print("Fetching wines...", flush=True)
 wines = datasource.fetch_vivino_wines(num_pages=1)
+print("Fetching reviews...", flush=True)
 wines = datasource.attach_vivino_reviews(wines, review_pages=1, reviews_per_page=REVIEWS_PER_WINE, language="en")
 
 # get all unique flavors from wine
+print("Building vectors...", flush=True)
 unique_flavors = transforms.unique_flavors(wines)
 flavor_idf = engine.build_flavor_idf(wines)
 
@@ -44,6 +79,7 @@ top_matches = engine.cosine_similarity_search(user_vector, wine_matrix, top_k=CO
 # pretty_print.print_user_vector(user_preferences, user_vector)
 # pretty_print.print_wine_vector(wines, unique_flavors, flavor_idf)
 
+print("Reranking candidates with SIE...", flush=True)
 reranked_matches = engine.rerank_wines_with_sie_reviews(
     wines,
     [match["row_index"] for match in top_matches],

@@ -1,4 +1,21 @@
+import os
+
 import numpy as np
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+def _resolve_sie_connection(base_url=None):
+    resolved_base_url = base_url or os.getenv("CLUSTER_URL")
+    if not resolved_base_url:
+        raise ValueError("Missing SIE base URL. Set CLUSTER_URL in the environment or pass base_url explicitly.")
+
+    api_key = os.getenv("API_KEY")
+    if not api_key:
+        raise ValueError("Missing SIE API key. Set API_KEY in the environment.")
+
+    return resolved_base_url, api_key
 
 
 def build_wine_rerank_text(wine_row):
@@ -154,7 +171,7 @@ def rerank_wines_with_sie(
     candidate_row_indices,
     user_preferences,
     *,
-    base_url="http://localhost:8080",
+    base_url=None,
     model_name="BAAI/bge-reranker-v2-m3",
     instruction=None,
 ):
@@ -163,7 +180,8 @@ def rerank_wines_with_sie(
     except ImportError as exc:
         raise ImportError("sie_sdk is required for SIE reranking.") from exc
 
-    client = SIEClient(base_url)
+    base_url, api_key = _resolve_sie_connection(base_url)
+    client = SIEClient(base_url, api_key=api_key)
     query_item = {"id": "user-query", "text": build_user_query_text(user_preferences)}
 
     candidate_rows = wines.iloc[candidate_row_indices]
@@ -208,7 +226,7 @@ def rerank_wines_with_sie_reviews(
     *,
     alpha=0.7,
     max_terms=12,
-    base_url="http://localhost:8080",
+    base_url=None,
     model_name="BAAI/bge-reranker-v2-m3",
     gpu=None,
 ):
@@ -217,7 +235,8 @@ def rerank_wines_with_sie_reviews(
     except ImportError as exc:
         raise ImportError("sie_sdk is required for SIE reranking.") from exc
 
-    client = SIEClient(base_url)
+    base_url, api_key = _resolve_sie_connection(base_url)
+    client = SIEClient(base_url, api_key=api_key)
     term_weights, final_query_vector = build_standard_rerank_query_weights(
         user_preferences,
         wines,

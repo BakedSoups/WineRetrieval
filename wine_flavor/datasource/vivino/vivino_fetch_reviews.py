@@ -1,5 +1,7 @@
 import requests
 
+REQUEST_TIMEOUT_S = 20
+
 
 def fetch_vivino_reviews(wine_id, year=None, page=1, num_pages=1, per_page=50, language=None):
     headers = {
@@ -20,6 +22,7 @@ def fetch_vivino_reviews(wine_id, year=None, page=1, num_pages=1, per_page=50, l
             f"https://www.vivino.com/api/wines/{wine_id}/reviews",
             params=params,
             headers=headers,
+            timeout=REQUEST_TIMEOUT_S,
         )
 
         if response.status_code != 200:

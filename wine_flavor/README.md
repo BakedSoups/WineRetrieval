@@ -19,20 +19,32 @@ pip install -e ../../sie/integrations/sie_chroma
 pip install -e ../../sie/packages/sie_server
 ```
 
-Start SIE in one terminal:
+Create your environment file:
 
 ```bash
 cd ~/code/pp/WineRetrieval/wine_flavor
-source venv/bin/activate
-sie-server serve
+cp .env.example .env
 ```
 
-Run this project in another terminal:
+Then set these values in `.env`:
+
+- `CLUSTER_URL`: the SIE server or cluster URL to use
+- `API_KEY`: the API key for that SIE server
+
+Run the project:
 
 ```bash
 cd ~/code/pp/WineRetrieval/wine_flavor
 source venv/bin/activate
 python main.py
+```
+
+If you want to use a local SIE server instead of a hosted cluster, set `CLUSTER_URL=http://localhost:8080` in `.env` and start it separately:
+
+```bash
+cd ~/code/pp/WineRetrieval/wine_flavor
+source venv/bin/activate
+sie-server serve
 ```
 
 ## main.py
@@ -50,6 +62,7 @@ It does six things:
 
 The main things you will edit in [`main.py`](/home/alex/code/pp/WineRetrieval/wine_flavor/main.py) are:
 
-- `SIE_BASE_URL`
 - `SIE_RERANK_MODEL`
 - `user_preferences`
+
+The SIE server selection is now driven by `.env`, not hardcoded in `main.py`.
