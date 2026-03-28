@@ -15,6 +15,7 @@ SIE_RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
 COSINE_TOP_K = 3
 REVIEWS_PER_WINE = 5
 RERANK_MAX_TERMS = 12
+REFERENCE_ROW_INDICES = []
 
 
 def ensure_sie_available():
@@ -75,6 +76,7 @@ user_preferences = {
 wine_matrix = engine.build_wine_matrix(wines, unique_flavors, flavor_idf)
 user_vector = engine.build_user_vector(user_preferences, unique_flavors, flavor_idf)
 top_matches = engine.cosine_similarity_search(user_vector, wine_matrix, top_k=COSINE_TOP_K)
+candidate_row_indices = [match["row_index"] for match in top_matches]
 
 # pretty_print.print_user_vector(user_preferences, user_vector)
 # pretty_print.print_wine_vector(wines, unique_flavors, flavor_idf)
@@ -82,10 +84,11 @@ top_matches = engine.cosine_similarity_search(user_vector, wine_matrix, top_k=CO
 print("Reranking candidates with SIE...", flush=True)
 reranked_matches = engine.rerank_wines_with_sie_reviews(
     wines,
-    [match["row_index"] for match in top_matches],
+    candidate_row_indices,
     user_preferences,
     unique_flavors,
     flavor_idf,
+    reference_row_indices=REFERENCE_ROW_INDICES,
     max_terms=RERANK_MAX_TERMS,
     base_url=SIE_BASE_URL,
     model_name=SIE_RERANK_MODEL,

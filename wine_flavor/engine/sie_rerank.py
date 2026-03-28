@@ -116,7 +116,7 @@ def _structure_label(value):
 def build_standard_rerank_query_weights(
     user_preferences,
     wines,
-    candidate_row_indices,
+    reference_row_indices,
     all_flavors,
     flavor_idf=None,
     alpha=0.7,
@@ -127,17 +127,17 @@ def build_standard_rerank_query_weights(
     user_vector = build_user_vector(user_preferences, all_flavors, flavor_idf)
     flavor_only_vectors = []
 
-    for row_index in candidate_row_indices:
+    for row_index in reference_row_indices or []:
         wine_vector = build_wine_vector(wines.iloc[row_index], all_flavors, flavor_idf)
         flavor_only_vector = np.concatenate([np.zeros(5), wine_vector[5:]])
         flavor_only_vectors.append(flavor_only_vector)
 
     if flavor_only_vectors:
-        average_candidate_vector = np.mean(np.vstack(flavor_only_vectors), axis=0)
+        average_reference_vector = np.mean(np.vstack(flavor_only_vectors), axis=0)
     else:
-        average_candidate_vector = np.zeros_like(user_vector)
+        average_reference_vector = np.zeros_like(user_vector)
 
-    final_query_vector = alpha * user_vector + (1 - alpha) * average_candidate_vector
+    final_query_vector = alpha * user_vector + (1 - alpha) * average_reference_vector
 
     term_weights = {}
     structure_names = ["acidity", "fizziness", "intensity", "sweetness", "tannin"]
@@ -217,6 +217,7 @@ def rerank_wines_with_sie_reviews(
     all_flavors,
     flavor_idf=None,
     *,
+    reference_row_indices=None,
     alpha=0.7,
     max_terms=12,
     base_url=None,
@@ -233,7 +234,7 @@ def rerank_wines_with_sie_reviews(
     term_weights, final_query_vector = build_standard_rerank_query_weights(
         user_preferences,
         wines,
-        candidate_row_indices,
+        reference_row_indices,
         all_flavors,
         flavor_idf,
         alpha=alpha,
