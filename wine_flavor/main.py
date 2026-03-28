@@ -3,7 +3,6 @@ import datasource
 import engine
 import os
 import pretty_print
-import requests
 import transforms
 from dotenv import load_dotenv
 
@@ -12,36 +11,31 @@ load_dotenv()
 SIE_BASE_URL = os.getenv("CLUSTER_URL")
 SIE_API_KEY = os.getenv("API_KEY")
 SIE_RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
+ALLOWED_SIE_RERANK_MODELS = {
+    "BAAI/bge-reranker-v2-m3",
+    "jinaai/jina-reranker-v2-base-multilingual",
+}
 COSINE_TOP_K = 3
 REVIEWS_PER_WINE = 5
 RERANK_MAX_TERMS = 12
 REFERENCE_ROW_INDICES = []
 
 
-def ensure_sie_available():
+def validate_sie_config():
     if not SIE_BASE_URL:
         raise ValueError("Missing CLUSTER_URL in the environment.")
     if not SIE_API_KEY:
         raise ValueError("Missing API_KEY in the environment.")
 
-    try:
-        from sie_sdk import SIEClient
-    except ImportError as exc:
-        raise ImportError("sie_sdk is required to use SIE reranking.") from exc
 
-    try:
-        response = requests.get(
-            f"{SIE_BASE_URL.rstrip('/')}/healthz",
-            headers={"Authorization": f"Bearer {SIE_API_KEY}"},
-            timeout=10,
-        )
-        response.raise_for_status()
-    except Exception as exc:
-        raise RuntimeError(f"Could not connect to SIE at {SIE_BASE_URL}. Check CLUSTER_URL, API_KEY, and cluster status.") from exc
+if SIE_RERANK_MODEL not in ALLOWED_SIE_RERANK_MODELS:
+    raise ValueError(
+        f"Unsupported SIE reranker model '{SIE_RERANK_MODEL}'. "
+        f"Choose one of: {sorted(ALLOWED_SIE_RERANK_MODELS)}"
+    )
 
 
-print("Checking SIE connection...", flush=True)
-ensure_sie_available()
+validate_sie_config()
 
 # If you need a broader batch later, uncomment this to print back some IDs.
 # datasource.print_vivino_wine_ids(num_pages=3, limit=10)
