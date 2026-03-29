@@ -2,6 +2,8 @@ import os
 import sys
 from pathlib import Path
 
+import pandas as pd
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -25,6 +27,7 @@ COSINE_TOP_K = 3
 REVIEWS_PER_WINE = 5
 RERANK_MAX_TERMS = 12
 REFERENCE_ROW_INDICES = []
+FETCH_NUM_PAGES = 5
 
 SCENARIOS = [
     {
@@ -98,11 +101,44 @@ def validate_config():
         )
 
 
+def build_cosine_results_frame(wines, top_matches):
+    match_rows = []
+    for rank, match in enumerate(top_matches):
+        match_rows.append(
+            {
+                "row_index": match["row_index"],
+                "cosine_score": match["similarity_score"],
+                "cosine_rank": rank,
+            }
+        )
+
+    match_frame = pd.DataFrame(match_rows)
+    return match_frame.merge(
+        wines.reset_index().rename(columns={"index": "row_index"})[
+            [
+                "row_index",
+                "wine_id",
+                "wine_name",
+                "winery_name",
+                "vintage_year",
+                "rating_average",
+                "country_name",
+                "region_name",
+                "price_amount",
+                "price_currency",
+                "review_count",
+            ]
+        ],
+        on="row_index",
+        how="left",
+    ).sort_values(["cosine_rank", "cosine_score"], ascending=[True, False])
+
+
 def main():
     validate_config()
 
     print("Fetching wines...", flush=True)
-    wines = datasource.fetch_vivino_wines(num_pages=1)
+    wines = datasource.fetch_vivino_wines(num_pages=FETCH_NUM_PAGES)
     print("Fetching reviews...", flush=True)
     wines = datasource.attach_vivino_reviews(
         wines,
@@ -124,6 +160,10 @@ def main():
         candidate_row_indices = [match["row_index"] for match in top_matches]
 
         print(f"\n=== {scenario_name} ===", flush=True)
+        cosine_results = build_cosine_results_frame(wines, top_matches)
+        print("\n--- Cosine Top Results ---")
+        print(cosine_results.round({"cosine_score": 4}).to_string(index=False))
+
         reranked_matches = engine.rerank_wines_with_sie_reviews(
             wines,
             candidate_row_indices,
