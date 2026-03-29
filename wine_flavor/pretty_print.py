@@ -39,7 +39,7 @@ def print_wine_vector(wines, unique_flavors, flavor_idf, row_index=0):
 
 def build_results_frame(wines, reranked_matches):
     match_frame = pd.DataFrame(reranked_matches)
-    return match_frame.merge(
+    result_frame = match_frame.merge(
         wines.reset_index().rename(columns={"index": "row_index"})[
             [
                 "row_index",
@@ -57,7 +57,13 @@ def build_results_frame(wines, reranked_matches):
         ],
         on="row_index",
         how="left",
+        suffixes=("", "_wine"),
     ).sort_values(["rerank_rank", "rerank_score"], ascending=[True, False])
+
+    if "review_count_wine" in result_frame.columns:
+        result_frame = result_frame.drop(columns=["review_count_wine"])
+
+    return result_frame
 
 
 def print_run_config(unique_flavors, wine_matrix, user_vector, cosine_top_k, reviews_per_wine, rerank_max_terms):
@@ -71,4 +77,7 @@ def print_run_config(unique_flavors, wine_matrix, user_vector, cosine_top_k, rev
 
 def print_top_results(top_results):
     print("\n--- Top Wine Recommendations (review rerank) ---")
-    print(top_results.to_string(index=False))
+    display_frame = top_results.copy()
+    if "rerank_score" in display_frame.columns:
+        display_frame["rerank_score"] = display_frame["rerank_score"].round(4)
+    print(display_frame.to_string(index=False))
