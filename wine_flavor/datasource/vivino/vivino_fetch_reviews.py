@@ -1,13 +1,7 @@
-import requests
-
-REQUEST_TIMEOUT_S = 20
+from ..http import get_json
 
 
 def fetch_vivino_reviews(wine_id, year=None, page=1, num_pages=1, per_page=50, language=None):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:66.0) Gecko/20100101 Firefox/66.0"
-    }
-
     all_reviews = []
 
     for current_page in range(page, page + num_pages):
@@ -18,18 +12,10 @@ def fetch_vivino_reviews(wine_id, year=None, page=1, num_pages=1, per_page=50, l
         if year is not None:
             params["year"] = year
 
-        response = requests.get(
+        payload = get_json(
             f"https://www.vivino.com/api/wines/{wine_id}/reviews",
             params=params,
-            headers=headers,
-            timeout=REQUEST_TIMEOUT_S,
         )
-
-        if response.status_code != 200:
-            print(f"Error fetching reviews for wine {wine_id}: {response.status_code} on page {current_page}")
-            break
-
-        payload = response.json()
         reviews = payload.get("reviews", [])
         if not reviews:
             break

@@ -1,16 +1,12 @@
-import requests
 import pandas as pd
 
-REQUEST_TIMEOUT_S = 20
+from ..http import get_json
 
 
 # grabs a list of wines
 def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_pages=1, country_code=None, wine_type_ids=None, min_rating=None):
     url = "https://www.vivino.com/api/explore/explore"
     all_wines = []
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:66.0) Gecko/20100101 Firefox/66.0"
-    }
 
     for current_page in range(page, page + num_pages):
         params = {
@@ -28,13 +24,8 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
         if min_rating:
             params["min_rating"] = min_rating
 
-        response = requests.get(url, params=params, headers=headers, timeout=REQUEST_TIMEOUT_S)
-
-        if response.status_code != 200:
-            print(f"Error: {response.status_code} on page {current_page}")
-            break
-
-        matches = response.json().get("explore_vintage", {}).get("matches", [])
+        payload = get_json(url, params=params)
+        matches = payload.get("explore_vintage", {}).get("matches", [])
 
         if not matches:
             break
