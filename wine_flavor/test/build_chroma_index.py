@@ -16,6 +16,7 @@ CHROMA_COLLECTION_NAME = "wine_taste_vectors"
 def main():
     print("Fetching wines...", flush=True)
     wines = datasource.fetch_vivino_wines(num_pages=FETCH_NUM_PAGES)
+    wines = wines.drop_duplicates(subset=["wine_id"]).reset_index(drop=True)
 
     print("Building vectors...", flush=True)
     unique_flavors = transforms.unique_flavors(wines)

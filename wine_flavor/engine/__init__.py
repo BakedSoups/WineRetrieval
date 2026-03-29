@@ -1,3 +1,4 @@
+from .chroma_store import get_chroma_collection, query_wine_vectors, upsert_wine_vectors
 from .retrieval import build_wine_matrix, cosine_similarity_search
 from .sie_rerank import (
     build_standard_rerank_query_weights,

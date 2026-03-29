@@ -94,6 +94,49 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
     return pd.DataFrame(all_wines)
 
 
+def fetch_vivino_wines_until_count(
+    target_wine_count,
+    *,
+    start_page=1,
+    batch_pages=10,
+    price_range_min=0,
+    price_range_max=1000,
+    country_code=None,
+    wine_type_ids=None,
+    min_rating=None,
+):
+    all_batches = []
+    current_page = start_page
+
+    while True:
+        batch = fetch_vivino_wines(
+            price_range_min=price_range_min,
+            price_range_max=price_range_max,
+            page=current_page,
+            num_pages=batch_pages,
+            country_code=country_code,
+            wine_type_ids=wine_type_ids,
+            min_rating=min_rating,
+        )
+
+        if batch.empty:
+            break
+
+        all_batches.append(batch)
+        combined_wines = pd.concat(all_batches, ignore_index=True)
+        unique_wines = combined_wines.drop_duplicates(subset=["wine_id"]).reset_index(drop=True)
+
+        if len(unique_wines) >= target_wine_count:
+            return unique_wines.head(target_wine_count).reset_index(drop=True)
+
+        current_page += batch_pages
+
+    if not all_batches:
+        return pd.DataFrame()
+
+    return pd.concat(all_batches, ignore_index=True).drop_duplicates(subset=["wine_id"]).reset_index(drop=True)
+
+
 def get_vivino_wine_ids(price_range_min=0, price_range_max=1000, page=1, num_pages=1, country_code=None, wine_type_ids=None, min_rating=None, limit=None):
     wines = fetch_vivino_wines(
         price_range_min=price_range_min,
