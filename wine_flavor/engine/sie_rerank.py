@@ -159,57 +159,6 @@ def build_standard_rerank_query_weights(
     return term_weights, final_query_vector
 
 
-def rerank_wines_with_sie(
-    wines,
-    candidate_row_indices,
-    user_preferences,
-    *,
-    base_url=None,
-    model_name="BAAI/bge-reranker-v2-m3",
-    instruction=None,
-):
-    try:
-        from sie_sdk import SIEClient
-    except ImportError as exc:
-        raise ImportError("sie_sdk is required for SIE reranking.") from exc
-
-    base_url, api_key = _resolve_sie_connection(base_url)
-    client = SIEClient(base_url, api_key=api_key)
-    query_item = {"id": "user-query", "text": build_user_query_text(user_preferences)}
-
-    candidate_rows = wines.iloc[candidate_row_indices]
-    items = []
-    row_index_by_item_id = {}
-
-    for row_index, wine_row in candidate_rows.iterrows():
-        item_id = f"wine-{row_index}"
-        items.append({
-            "id": item_id,
-            "text": build_wine_rerank_text(wine_row),
-        })
-        row_index_by_item_id[item_id] = int(row_index)
-
-    score_result = client.score(
-        model_name,
-        query=query_item,
-        items=items,
-        instruction=instruction,
-        wait_for_capacity=True,
-        provision_timeout_s=300,
-    )
-
-    reranked_matches = []
-    for score_entry in score_result.get("scores", []):
-        item_id = score_entry["item_id"]
-        reranked_matches.append({
-            "row_index": row_index_by_item_id[item_id],
-            "rerank_score": float(score_entry["score"]),
-            "rerank_rank": int(score_entry["rank"]),
-        })
-
-    return reranked_matches
-
-
 def rerank_wines_with_sie_reviews(
     wines,
     candidate_row_indices,

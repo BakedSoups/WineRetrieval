@@ -11,4 +11,3 @@ urllib3==2.6.3
 
 # Local sibling repo dependencies are installed separately:
 # pip install -e ../../sie/packages/sie_sdk
-# pip install -e ../../sie/integrations/sie_chroma

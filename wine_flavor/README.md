@@ -15,7 +15,6 @@ python3.12 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 pip install -e ../../sie/packages/sie_sdk
-pip install -e ../../sie/integrations/sie_chroma
 pip install -e ../../sie/packages/sie_server
 ```
 
