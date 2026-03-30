@@ -11,31 +11,11 @@ load_dotenv()
 SIE_BASE_URL = os.getenv("CLUSTER_URL")
 SIE_API_KEY = os.getenv("API_KEY")
 SIE_RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
-ALLOWED_SIE_RERANK_MODELS = {
-    "BAAI/bge-reranker-v2-m3",
-    "jinaai/jina-reranker-v2-base-multilingual",
-}
 COSINE_TOP_K = 3
 REVIEWS_PER_WINE = 5
 RERANK_MAX_TERMS = 12
 REFERENCE_ROW_INDICES = []
 
-
-def validate_sie_config():
-    if not SIE_BASE_URL:
-        raise ValueError("Missing CLUSTER_URL in the environment.")
-    if not SIE_API_KEY:
-        raise ValueError("Missing API_KEY in the environment.")
-
-
-if SIE_RERANK_MODEL not in ALLOWED_SIE_RERANK_MODELS:
-    raise ValueError(
-        f"Unsupported SIE reranker model '{SIE_RERANK_MODEL}'. "
-        f"Choose one of: {sorted(ALLOWED_SIE_RERANK_MODELS)}"
-    )
-
-
-validate_sie_config()
 
 # If you need a broader batch later, uncomment this to print back some IDs.
 # datasource.print_vivino_wine_ids(num_pages=3, limit=10)
