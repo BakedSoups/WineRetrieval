@@ -50,6 +50,7 @@ print("Building vectors...", flush=True)
 unique_flavors = transforms.unique_flavors(wines)
 flavor_idf = engine.build_flavor_idf(wines)
 
+# test example vector 
 user_preferences = {
     "structure": {
         "acidity": 0.7,
