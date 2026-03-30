@@ -1,0 +1,8 @@
+{
+  "cached_unique_wines": 1750,
+  "last_error": "Failed to fetch https://www.vivino.com/api/explore/explore after 5 attempts.",
+  "next_page": 141,
+  "stalled_batches": 5,
+  "status": "paused",
+  "target_wine_count": 10000
+}

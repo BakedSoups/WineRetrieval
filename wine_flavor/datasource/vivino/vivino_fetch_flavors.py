@@ -35,13 +35,13 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
             wine = vintage.get("wine", {})
             winery = wine.get("winery", {})
             vintage_stats = vintage.get("statistics", {})
-            region = wine.get("region", {})
-            country = region.get("country", {})
+            region = wine.get("region") or {}
+            country = region.get("country") or {}
             taste = wine.get("taste") or {}
             structure = taste.get("structure") or {}
             style = wine.get("style") or {}
             price = item.get("price", {})
-            currency = price.get("currency", {})
+            currency = price.get("currency") or {}
 
             food_pairings = [food.get("name") for food in (style.get("foods") or [])]
             grapes_composition = [grape.get("name") for grape in (style.get("grapes") or [])]
@@ -99,6 +99,7 @@ def fetch_vivino_wines_until_count(
     *,
     start_page=1,
     batch_pages=10,
+    max_stalled_batches=5,
     price_range_min=0,
     price_range_max=1000,
     country_code=None,
@@ -107,17 +108,24 @@ def fetch_vivino_wines_until_count(
 ):
     all_batches = []
     current_page = start_page
+    stalled_batches = 0
+    previous_unique_count = 0
 
     while True:
-        batch = fetch_vivino_wines(
-            price_range_min=price_range_min,
-            price_range_max=price_range_max,
-            page=current_page,
-            num_pages=batch_pages,
-            country_code=country_code,
-            wine_type_ids=wine_type_ids,
-            min_rating=min_rating,
-        )
+        print(f"Fetching wine pages {current_page}-{current_page + batch_pages - 1}...", flush=True)
+        try:
+            batch = fetch_vivino_wines(
+                price_range_min=price_range_min,
+                price_range_max=price_range_max,
+                page=current_page,
+                num_pages=batch_pages,
+                country_code=country_code,
+                wine_type_ids=wine_type_ids,
+                min_rating=min_rating,
+            )
+        except RuntimeError as exc:
+            print(f"Stopping fetch early after request failure: {exc}", flush=True)
+            break
 
         if batch.empty:
             break
@@ -125,9 +133,30 @@ def fetch_vivino_wines_until_count(
         all_batches.append(batch)
         combined_wines = pd.concat(all_batches, ignore_index=True)
         unique_wines = combined_wines.drop_duplicates(subset=["wine_id"]).reset_index(drop=True)
+        unique_count = len(unique_wines)
+        print(
+            f"Collected {unique_count} unique wines so far "
+            f"(target: {target_wine_count}).",
+            flush=True,
+        )
 
-        if len(unique_wines) >= target_wine_count:
+        if unique_count >= target_wine_count:
             return unique_wines.head(target_wine_count).reset_index(drop=True)
+
+        if unique_count == previous_unique_count:
+            stalled_batches += 1
+            print(
+                f"No new unique wines found in this batch "
+                f"({stalled_batches}/{max_stalled_batches} stalled batches).",
+                flush=True,
+            )
+            if stalled_batches >= max_stalled_batches:
+                print("Stopping fetch early because the unique wine count has stalled.", flush=True)
+                return unique_wines
+        else:
+            stalled_batches = 0
+
+        previous_unique_count = unique_count
 
         current_page += batch_pages
 
