@@ -11,10 +11,21 @@ load_dotenv()
 SIE_BASE_URL = os.getenv("CLUSTER_URL")
 SIE_API_KEY = os.getenv("API_KEY")
 SIE_RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
+ALLOWED_SIE_RERANK_MODELS = {
+    "BAAI/bge-reranker-v2-m3",
+    "jinaai/jina-reranker-v2-base-multilingual",
+}
 COSINE_TOP_K = 3
 REVIEWS_PER_WINE = 5
 RERANK_MAX_TERMS = 12
 REFERENCE_ROW_INDICES = []
+
+
+if SIE_RERANK_MODEL not in ALLOWED_SIE_RERANK_MODELS:
+    raise ValueError(
+        f"Unsupported SIE reranker model '{SIE_RERANK_MODEL}'. "
+        f"Choose one of: {sorted(ALLOWED_SIE_RERANK_MODELS)}"
+    )
 
 
 # If you need a broader batch later, uncomment this to print back some IDs.
