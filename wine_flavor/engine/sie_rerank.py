@@ -125,36 +125,38 @@ def build_standard_rerank_query_weights(
     from .vectors import build_user_vector, build_wine_vector
 
     user_vector = build_user_vector(user_preferences, all_flavors, flavor_idf)
-    flavor_only_vectors = []
+    reference_vectors = []
 
     for row_index in reference_row_indices or []:
         wine_vector = build_wine_vector(wines.iloc[row_index], all_flavors, flavor_idf)
-        flavor_only_vector = np.concatenate([np.zeros(5), wine_vector[5:]])
-        flavor_only_vectors.append(flavor_only_vector)
+        reference_vectors.append(wine_vector)
 
-    if flavor_only_vectors:
-        average_reference_vector = np.mean(np.vstack(flavor_only_vectors), axis=0)
+    if reference_vectors:
+        average_reference_vector = np.mean(np.vstack(reference_vectors), axis=0)
     else:
         average_reference_vector = np.zeros_like(user_vector)
 
     final_query_vector = alpha * user_vector + (1 - alpha) * average_reference_vector
 
-    term_weights = {}
+    structure_term_weights = {}
+    flavor_term_weights = {}
     structure_names = ["acidity", "fizziness", "intensity", "sweetness", "tannin"]
 
     for i, structure_name in enumerate(structure_names):
         structure_weight = float(final_query_vector[i])
         if structure_weight > 0:
-            term_weights[f"{_structure_label(structure_weight)} {structure_name}"] = structure_weight
+            structure_term_weights[f"{_structure_label(structure_weight)} {structure_name}"] = structure_weight
 
     for i, flavor_name in enumerate(all_flavors, start=5):
         flavor_weight = float(final_query_vector[i])
         if flavor_weight > 0:
-            term_weights[flavor_name] = flavor_weight
+            flavor_term_weights[flavor_name] = flavor_weight
 
     if max_terms is not None:
-        sorted_terms = sorted(term_weights.items(), key=lambda item: item[1], reverse=True)
-        term_weights = dict(sorted_terms[:max_terms])
+        sorted_flavor_terms = sorted(flavor_term_weights.items(), key=lambda item: item[1], reverse=True)
+        flavor_term_weights = dict(sorted_flavor_terms[:max_terms])
+
+    term_weights = {**structure_term_weights, **flavor_term_weights}
 
     return term_weights, final_query_vector
 
