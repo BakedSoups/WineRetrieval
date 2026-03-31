@@ -2,3 +2,4 @@ venv/
 .env
 data/chroma/
 chroma.sqlite3
+.db
