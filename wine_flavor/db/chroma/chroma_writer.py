@@ -3,7 +3,7 @@ from pathlib import Path
 import engine
 
 
-def get_collection(persist_directory, collection_name):
+def open_or_create_chroma_collection(persist_directory, collection_name):
     try:
         import chromadb
     except ImportError as exc:
@@ -16,7 +16,7 @@ def get_collection(persist_directory, collection_name):
     return client.get_or_create_collection(collection_name)
 
 
-def upsert_vintages(collection, vintages, unique_flavors, flavor_idf, batch_size=200):
+def save_vintage_vectors_to_chroma(collection, vintages, unique_flavors, flavor_idf, batch_size=200):
     total_upserted = 0
 
     for batch_start in range(0, len(vintages), batch_size):

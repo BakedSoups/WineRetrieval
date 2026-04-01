@@ -14,7 +14,7 @@ def _parse_json(value, default):
         return default
 
 
-def load_all_vintages(db_path):
+def load_all_vintages_from_sqlite(db_path):
     db_path = Path(db_path)
     connection = sqlite3.connect(db_path)
     try:

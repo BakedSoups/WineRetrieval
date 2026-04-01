@@ -8,6 +8,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import engine
+from db.chroma import load_all_possible_flavors
 
 DB_PATH = PROJECT_ROOT / "wine_flavor.db"
 CHROMA_PERSIST_DIR = PROJECT_ROOT / "data" / "chroma"
@@ -31,12 +32,7 @@ USER_PREFERENCES = {
 }
 
 
-def load_flavor_vocab():
-    payload = json.loads(FLAVOR_VOCAB_PATH.read_text())
-    return payload["unique_flavors"], payload["flavor_idf"]
-
-
-def get_collection():
+def open_existing_chroma_collection():
     try:
         import chromadb
     except ImportError as exc:
@@ -68,9 +64,9 @@ def load_vintages_by_ids(vintage_ids):
 
 
 def main():
-    unique_flavors, flavor_idf = load_flavor_vocab()
+    unique_flavors, flavor_idf = load_all_possible_flavors(FLAVOR_VOCAB_PATH)
     user_vector = engine.build_user_vector(USER_PREFERENCES, unique_flavors, flavor_idf)
-    collection = get_collection()
+    collection = open_existing_chroma_collection()
 
     results = collection.query(
         query_embeddings=[user_vector.tolist()],

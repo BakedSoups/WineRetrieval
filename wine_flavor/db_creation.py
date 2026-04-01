@@ -12,6 +12,7 @@ MAX_STALLED_BATCHES = 5
 
 # Vivino type ids seen in this project:
 # 1 = red, 2 = white, 3 = sparkling, 4 = rose
+
 QUERY_SLICES = [
     {"country_code": "fr", "wine_type_ids": [1], "price_range_min": 0, "price_range_max": 20},
     {"country_code": "fr", "wine_type_ids": [2], "price_range_min": 0, "price_range_max": 20},
