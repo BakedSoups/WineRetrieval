@@ -1,4 +1,5 @@
 import sys
+import runpy
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -72,6 +73,14 @@ def run_crisp_white_sanity_test():
     return False
 
 
+def run_review_rerank_test():
+    print("Running review rerank sanity test...", flush=True)
+    runpy.run_path(str(PROJECT_ROOT / "test" / "test_rerank_reviews.py"), run_name="__main__")
+    return True
+
+
 if __name__ == "__main__":
     success = run_crisp_white_sanity_test()
+    if success:
+        success = run_review_rerank_test()
     raise SystemExit(0 if success else 1)
