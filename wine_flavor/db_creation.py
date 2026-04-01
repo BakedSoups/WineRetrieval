@@ -88,6 +88,7 @@ def create_tables(connection):
             wine_id INTEGER NOT NULL,
             vintage_id INTEGER PRIMARY KEY,
             vintage_name TEXT,
+            bottle_label_url TEXT,
             winery_name TEXT,
             wine_name TEXT,
             vintage_year TEXT,
@@ -136,6 +137,7 @@ def upsert_wine_batch(connection, wines):
                 int(wine_id),
                 wine_row.get("vintage_id"),
                 wine_row.get("vintage_name"),
+                wine_row.get("bottle_label_url"),
                 wine_row.get("winery_name"),
                 wine_row.get("wine_name"),
                 str(wine_row.get("vintage_year")) if wine_row.get("vintage_year") is not None else None,
@@ -170,6 +172,7 @@ def upsert_wine_batch(connection, wines):
             wine_id,
             vintage_id,
             vintage_name,
+            bottle_label_url,
             winery_name,
             wine_name,
             vintage_year,
@@ -196,12 +199,13 @@ def upsert_wine_batch(connection, wines):
             price_amount,
             price_currency
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(vintage_id) DO UPDATE SET
             winery_name=excluded.winery_name,
             wine_name=excluded.wine_name,
             wine_id=excluded.wine_id,
             vintage_name=excluded.vintage_name,
+            bottle_label_url=excluded.bottle_label_url,
             vintage_year=excluded.vintage_year,
             rating_average=excluded.rating_average,
             ratings_count=excluded.ratings_count,
