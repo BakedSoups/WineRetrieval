@@ -1,46 +1,19 @@
-import os
 import sys
-import types
 from pathlib import Path
-from unittest.mock import patch
 
 import pandas as pd
+from dotenv import load_dotenv
 
-# Validates review-based reranking with a mocked SIE client:
-# better review matches should rank higher, and missing reviews should score zero.
+# Integration-style rerank sanity check using the real SIE client:
+# prints the query and reranked output, then checks the strongest white review ranks first.
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+load_dotenv(PROJECT_ROOT / ".env")
+
 from engine.sie_rerank import rerank_wines_with_sie_reviews
-
-
-class FakeSIEClient:
-    def __init__(self, base_url, api_key=None):
-        self.base_url = base_url
-        self.api_key = api_key
-
-    def score(self, model_name, query, items, gpu=None, wait_for_capacity=True, provision_timeout_s=900):
-        scores = []
-        for rank, item in enumerate(items):
-            text = item["text"].lower()
-            if any(keyword in text for keyword in ["citrus", "mineral", "floral", "orange zest", "crisp"]):
-                score = 0.9
-            elif any(keyword in text for keyword in ["vanilla", "jammy", "sweet"]):
-                score = 0.2
-            else:
-                score = 0.1
-
-            scores.append(
-                {
-                    "item_id": item["id"],
-                    "score": score,
-                    "rank": rank,
-                }
-            )
-
-        return {"scores": scores}
 
 
 def main():
@@ -125,20 +98,6 @@ def main():
     }
     all_flavors = ["orange zest", "minerals", "floral", "vanilla", "sweet"]
 
-    fake_module = types.ModuleType("sie_sdk")
-    fake_module.SIEClient = FakeSIEClient
-
-    with patch.dict(sys.modules, {"sie_sdk": fake_module}):
-        with patch.dict(os.environ, {"API_KEY": "test-api-key"}, clear=False):
-            reranked = rerank_wines_with_sie_reviews(
-                wines,
-                candidate_row_indices=[0, 1, 2],
-                user_preferences=user_preferences,
-                all_flavors=all_flavors,
-                base_url="http://test-sie",
-                model_name="BAAI/bge-reranker-v2-m3",
-            )
-
     print("User query:")
     print(
         "- structure:",
@@ -148,6 +107,15 @@ def main():
         "- flavors:",
         ", ".join(f"{name}={value}" for name, value in user_preferences["flavors"].items()),
     )
+
+    reranked = rerank_wines_with_sie_reviews(
+        wines,
+        candidate_row_indices=[0, 1, 2],
+        user_preferences=user_preferences,
+        all_flavors=all_flavors,
+        model_name="BAAI/bge-reranker-v2-m3",
+    )
+
     print("Reranked output:")
     for item in reranked:
         wine_row = wines.iloc[item["row_index"]]
@@ -159,13 +127,21 @@ def main():
             f"rerank_rank={item['rerank_rank']}"
         )
 
-    assert reranked[0]["row_index"] == 0
-    assert reranked[0]["rerank_score"] > reranked[1]["rerank_score"]
-    assert reranked[-1]["row_index"] == 2
-    assert reranked[-1]["review_count"] == 0
-    assert reranked[-1]["rerank_score"] == 0.0
-    assert reranked[0]["query_vector_length"] == 5 + len(all_flavors)
-    print("PASS: review rerank prefers stronger review matches and handles missing reviews.")
+    passed = (
+        reranked[0]["row_index"] == 0
+        and reranked[0]["rerank_score"] > reranked[1]["rerank_score"]
+        and reranked[-1]["row_index"] == 2
+        and reranked[-1]["review_count"] == 0
+        and reranked[-1]["rerank_score"] == 0.0
+        and reranked[0]["query_vector_length"] == 5 + len(all_flavors)
+    )
+
+    if passed:
+        print("PASS: rerank output favors the white-like reviews and leaves missing reviews at zero.")
+        return
+
+    print("FAIL: rerank output did not match the expected ordering.")
+    raise SystemExit(1)
 
 
 if __name__ == "__main__":
