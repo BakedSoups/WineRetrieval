@@ -27,10 +27,6 @@ if SIE_RERANK_MODEL not in ALLOWED_SIE_RERANK_MODELS:
         f"Choose one of: {sorted(ALLOWED_SIE_RERANK_MODELS)}"
     )
 
-
-# If you need a broader batch later, uncomment this to print back some IDs.
-# datasource.print_vivino_wine_ids(num_pages=3, limit=10)
-
 print("Fetching wines...", flush=True)
 wines = datasource.fetch_vivino_wines(num_pages=1)
 print("Fetching reviews...", flush=True)
@@ -64,9 +60,6 @@ user_vector = engine.build_user_vector(user_preferences, unique_flavors, flavor_
 top_matches = engine.cosine_similarity_search(user_vector, wine_matrix, top_k=COSINE_TOP_K)
 candidate_row_indices = [match["row_index"] for match in top_matches]
 
-# pretty_print.print_user_vector(user_preferences, user_vector)
-# pretty_print.print_wine_vector(wines, unique_flavors, flavor_idf)
-
 print("Reranking candidates with SIE...", flush=True)
 reranked_matches = engine.rerank_wines_with_sie_reviews(
     wines,
@@ -80,13 +73,4 @@ reranked_matches = engine.rerank_wines_with_sie_reviews(
     model_name=SIE_RERANK_MODEL,
 )
 top_results = pretty_print.build_results_frame(wines, reranked_matches)
-
-# pretty_print.print_run_config(
-#     unique_flavors,
-#     wine_matrix,
-#     user_vector,
-#     COSINE_TOP_K,
-#     REVIEWS_PER_WINE,
-#     RERANK_MAX_TERMS,
-# )
 pretty_print.print_top_results(top_results)
