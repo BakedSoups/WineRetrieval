@@ -1,8 +1,5 @@
 {
-  "current_slice_index": 12,
-  "last_error": null,
-  "last_unique_count": 1758,
-  "next_page": 131,
+  "current_slice_index": 14,
   "slice_states": {
     "all|4|0|25": {
       "last_error": null,
@@ -13,101 +10,108 @@
     },
     "ar|1|0|25": {
       "last_error": null,
-      "last_unique_count": 5293,
-      "next_page": 41,
+      "last_unique_count": 6944,
+      "next_page": 121,
+      "stalled_batches": 0,
+      "status": "completed"
+    },
+    "ar|2|0|25": {
+      "last_error": null,
+      "last_unique_count": 6945,
+      "next_page": 61,
       "stalled_batches": 0,
       "status": "completed"
     },
     "au|1|0|25": {
       "last_error": null,
-      "last_unique_count": 5293,
+      "last_unique_count": 6945,
       "next_page": 41,
       "stalled_batches": 0,
       "status": "completed"
     },
     "au|2|0|25": {
       "last_error": null,
-      "last_unique_count": 5297,
-      "next_page": 91,
+      "last_unique_count": 6945,
+      "next_page": 41,
       "stalled_batches": 0,
       "status": "completed"
     },
     "es|1|0|25": {
       "last_error": null,
-      "last_unique_count": 5297,
+      "last_unique_count": 6945,
       "next_page": 41,
       "stalled_batches": 0,
       "status": "completed"
     },
     "fr|1|0|20": {
       "last_error": null,
-      "last_unique_count": 2635,
+      "last_unique_count": 2014,
       "next_page": 131,
       "stalled_batches": 0,
       "status": "completed"
     },
     "fr|2|0|20": {
       "last_error": null,
-      "last_unique_count": 3637,
+      "last_unique_count": 4012,
       "next_page": 131,
       "stalled_batches": 0,
       "status": "completed"
     },
     "fr|3|0|30": {
       "last_error": null,
-      "last_unique_count": 5218,
+      "last_unique_count": 5975,
       "next_page": 131,
       "stalled_batches": 0,
       "status": "completed"
     },
     "it|1|0|25": {
       "last_error": null,
-      "last_unique_count": 5297,
+      "last_unique_count": 6945,
       "next_page": 41,
       "stalled_batches": 0,
       "status": "completed"
     },
     "it|2|0|25": {
       "last_error": null,
-      "last_unique_count": 5297,
+      "last_unique_count": 6945,
       "next_page": 41,
       "stalled_batches": 0,
       "status": "completed"
     },
     "pt|1|0|25": {
       "last_error": null,
-      "last_unique_count": 5297,
+      "last_unique_count": 6945,
       "next_page": 41,
-      "stalled_batches": 4,
-      "status": "in_progress"
+      "stalled_batches": 0,
+      "status": "completed"
     },
-    "us|1|0|20": {
+    "us|1|0|150": {
       "last_error": null,
-      "last_unique_count": 5234,
+      "last_unique_count": 5988,
       "next_page": 131,
       "stalled_batches": 0,
       "status": "completed"
     },
-    "us|2|0|20": {
+    "us|2|0|150": {
       "last_error": null,
-      "last_unique_count": 5244,
+      "last_unique_count": 6013,
       "next_page": 131,
       "stalled_batches": 0,
       "status": "completed"
     },
-    "us|3|0|30": {
+    "us|3|0|150": {
       "last_error": null,
-      "last_unique_count": 5293,
+      "last_unique_count": 6939,
       "next_page": 131,
       "stalled_batches": 0,
       "status": "completed"
     },
     "za|1|0|25": {
-      "last_error": null,
-      "last_unique_count": 0,
+      "last_error": "Failed to fetch https://www.vivino.com/api/explore/explore after 5 attempts.",
+      "last_unique_count": 6945,
       "next_page": 1,
       "stalled_batches": 0,
-      "status": "not_started"
+      "status": "paused"
     },
     "za|2|0|25": {
       "last_error": null,
@@ -117,6 +121,5 @@
       "status": "not_started"
     }
   },
-  "stalled_batches": 7,
-  "status": "in_progress"
+  "status": "paused"
 }

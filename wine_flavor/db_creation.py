@@ -16,10 +16,11 @@ QUERY_SLICES = [
     {"country_code": "fr", "wine_type_ids": [1], "price_range_min": 0, "price_range_max": 20},
     {"country_code": "fr", "wine_type_ids": [2], "price_range_min": 0, "price_range_max": 20},
     {"country_code": "fr", "wine_type_ids": [3], "price_range_min": 0, "price_range_max": 30},
-    {"country_code": "us", "wine_type_ids": [1], "price_range_min": 0, "price_range_max": 20},
-    {"country_code": "us", "wine_type_ids": [2], "price_range_min": 0, "price_range_max": 20},
-    {"country_code": "us", "wine_type_ids": [3], "price_range_min": 0, "price_range_max": 30},
+    {"country_code": "us", "wine_type_ids": [1], "price_range_min": 0, "price_range_max": 150},
+    {"country_code": "us", "wine_type_ids": [2], "price_range_min": 0, "price_range_max": 150},
+    {"country_code": "us", "wine_type_ids": [3], "price_range_min": 0, "price_range_max": 150},
     {"country_code": "ar", "wine_type_ids": [1], "price_range_min": 0, "price_range_max": 25},
+    {"country_code": "ar", "wine_type_ids": [2], "price_range_min": 0, "price_range_max": 25},
     {"country_code": "au", "wine_type_ids": [1], "price_range_min": 0, "price_range_max": 25},
     {"country_code": "au", "wine_type_ids": [2], "price_range_min": 0, "price_range_max": 25},
     {"country_code": "it", "wine_type_ids": [1], "price_range_min": 0, "price_range_max": 25},
@@ -83,8 +84,10 @@ def connect_db():
 def create_tables(connection):
     connection.execute(
         """
-        CREATE TABLE IF NOT EXISTS wines (
-            wine_id INTEGER PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS vintages (
+            wine_id INTEGER NOT NULL,
+            vintage_id INTEGER PRIMARY KEY,
+            vintage_name TEXT,
             winery_name TEXT,
             wine_name TEXT,
             vintage_year TEXT,
@@ -117,7 +120,7 @@ def create_tables(connection):
 
 
 def count_wines(connection):
-    row = connection.execute("SELECT COUNT(*) FROM wines").fetchone()
+    row = connection.execute("SELECT COUNT(*) FROM vintages").fetchone()
     return int(row[0]) if row else 0
 
 
@@ -131,6 +134,8 @@ def upsert_wine_batch(connection, wines):
         records.append(
             (
                 int(wine_id),
+                wine_row.get("vintage_id"),
+                wine_row.get("vintage_name"),
                 wine_row.get("winery_name"),
                 wine_row.get("wine_name"),
                 str(wine_row.get("vintage_year")) if wine_row.get("vintage_year") is not None else None,
@@ -161,8 +166,10 @@ def upsert_wine_batch(connection, wines):
 
     connection.executemany(
         """
-        INSERT INTO wines (
+        INSERT INTO vintages (
             wine_id,
+            vintage_id,
+            vintage_name,
             winery_name,
             wine_name,
             vintage_year,
@@ -189,10 +196,12 @@ def upsert_wine_batch(connection, wines):
             price_amount,
             price_currency
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(wine_id) DO UPDATE SET
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(vintage_id) DO UPDATE SET
             winery_name=excluded.winery_name,
             wine_name=excluded.wine_name,
+            wine_id=excluded.wine_id,
+            vintage_name=excluded.vintage_name,
             vintage_year=excluded.vintage_year,
             rating_average=excluded.rating_average,
             ratings_count=excluded.ratings_count,
@@ -253,6 +262,13 @@ def main():
             slice_config = QUERY_SLICES[current_slice_index]
             slice_key = _slice_key(slice_config)
             slice_state = state["slice_states"][slice_key]
+
+            if slice_state.get("status") == "completed":
+                print(f"Skipping completed slice {current_slice_index + 1}/{len(QUERY_SLICES)}: {slice_key}.", flush=True)
+                current_slice_index += 1
+                state["current_slice_index"] = current_slice_index
+                save_state(state)
+                continue
 
             current_page = int(slice_state["next_page"])
             stalled_batches = int(slice_state["stalled_batches"])
