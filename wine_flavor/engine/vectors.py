@@ -9,12 +9,7 @@ def normalize_preference_value(value, default=0.5):
     if value is None or pd.isna(value):
         return float(default)
 
-    normalized_value = float(value)
-    if normalized_value < 0.0:
-        return 0.0
-    if normalized_value > 1.0:
-        return 1.0
-    return normalized_value
+    return float(value)
 
 
 def normalize_user_preferences(user_preferences):
