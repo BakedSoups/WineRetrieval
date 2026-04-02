@@ -18,16 +18,6 @@ def _resolve_sie_connection(base_url=None):
     return resolved_base_url, api_key
 
 
-def _resolve_rerank_alpha(alpha=None):
-    if alpha is not None:
-        return float(alpha)
-
-    env_alpha = os.getenv("RERANK_ALPHA")
-    if env_alpha is None or env_alpha == "":
-        return 0.7
-    return float(env_alpha)
-
-
 def build_wine_rerank_text(wine_row):
     from .vectors import pull_flavor_counts
 
@@ -134,7 +124,6 @@ def build_standard_rerank_query_weights(
 ):
     from .vectors import build_user_vector, build_wine_vector
 
-    alpha = _resolve_rerank_alpha(alpha)
     user_vector = build_user_vector(user_preferences, all_flavors, flavor_idf)
     reference_vectors = []
 

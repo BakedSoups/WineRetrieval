@@ -4,20 +4,10 @@ import numpy as np
 from dotenv import load_dotenv
 from sklearn.metrics.pairwise import cosine_similarity
 
-from .sie_rerank import _resolve_rerank_alpha, _resolve_sie_connection, pull_wine_reviews
+from .sie_rerank import _resolve_sie_connection, pull_wine_reviews
 from .vectors import normalize_user_preferences, pull_structure
 
 load_dotenv()
-
-
-def _resolve_custom_rerank_a(a=None):
-    if a is not None:
-        return float(a)
-
-    env_a = os.getenv("CUSTOM_RERANK_A")
-    if env_a is None or env_a == "":
-        return 0.7
-    return float(env_a)
 
 
 def _structure_label(value):
@@ -228,8 +218,6 @@ def rerank_wines_with_custom_embeddings(
         raise ImportError("sie_sdk is required for custom SIE reranking.") from exc
 
     base_url, api_key = _resolve_sie_connection(base_url)
-    a = _resolve_custom_rerank_a(a)
-    alpha = _resolve_rerank_alpha(alpha)
     model_name = model_name or os.getenv("SIE_EMBEDDING_MODEL", "BAAI/bge-m3")
 
     client = SIEClient(base_url, api_key=api_key)
