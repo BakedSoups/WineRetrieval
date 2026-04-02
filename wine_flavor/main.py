@@ -8,18 +8,36 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SIE_BASE_URL = os.getenv("CLUSTER_URL")
-SIE_API_KEY = os.getenv("API_KEY")
-SIE_RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
+def _require_env(name):
+    value = os.getenv(name)
+    if value is None or value == "":
+        raise ValueError(f"Missing required environment variable: {name}")
+    return value
+
+
+SIE_BASE_URL = _require_env("CLUSTER_URL")
+SIE_API_KEY = _require_env("API_KEY")
+RERANK_METHOD = _require_env("RERANK_METHOD")
+SIE_RERANK_MODEL = _require_env("SIE_RERANK_MODEL")
+SIE_EMBEDDING_MODEL = _require_env("SIE_EMBEDDING_MODEL")
+CUSTOM_RERANK_A = float(_require_env("CUSTOM_RERANK_A"))
+CUSTOM_RERANK_NO_REVIEW_PENALTY = float(_require_env("CUSTOM_RERANK_NO_REVIEW_PENALTY"))
 ALLOWED_SIE_RERANK_MODELS = {
     "BAAI/bge-reranker-v2-m3",
     "jinaai/jina-reranker-v2-base-multilingual",
 }
+ALLOWED_RERANK_METHODS = {"standard", "custom"}
 COSINE_TOP_K = 3
 REVIEWS_PER_WINE = 5
 RERANK_MAX_TERMS = 12
 REFERENCE_ROW_INDICES = []
 
+
+if RERANK_METHOD not in ALLOWED_RERANK_METHODS:
+    raise ValueError(
+        f"Unsupported rerank method '{RERANK_METHOD}'. "
+        f"Choose one of: {sorted(ALLOWED_RERANK_METHODS)}"
+    )
 
 if SIE_RERANK_MODEL not in ALLOWED_SIE_RERANK_MODELS:
     raise ValueError(
@@ -61,16 +79,27 @@ top_matches = engine.cosine_similarity_search(user_vector, wine_matrix, top_k=CO
 candidate_row_indices = [match["row_index"] for match in top_matches]
 
 print("Reranking candidates with SIE...", flush=True)
-reranked_matches = engine.rerank_wines_with_sie_reviews(
-    wines,
-    candidate_row_indices,
-    user_preferences,
-    unique_flavors,
-    flavor_idf,
-    reference_row_indices=REFERENCE_ROW_INDICES,
-    max_terms=RERANK_MAX_TERMS,
-    base_url=SIE_BASE_URL,
-    model_name=SIE_RERANK_MODEL,
-)
+if RERANK_METHOD == "custom":
+    reranked_matches = engine.rerank_wines_with_custom_embeddings(
+        wines,
+        candidate_row_indices,
+        user_preferences,
+        base_url=SIE_BASE_URL,
+        model_name=SIE_EMBEDDING_MODEL,
+        a=CUSTOM_RERANK_A,
+        no_review_penalty=CUSTOM_RERANK_NO_REVIEW_PENALTY,
+    )
+else:
+    reranked_matches = engine.rerank_wines_with_sie_reviews(
+        wines,
+        candidate_row_indices,
+        user_preferences,
+        unique_flavors,
+        flavor_idf,
+        reference_row_indices=REFERENCE_ROW_INDICES,
+        max_terms=RERANK_MAX_TERMS,
+        base_url=SIE_BASE_URL,
+        model_name=SIE_RERANK_MODEL,
+    )
 top_results = pretty_print.build_results_frame(wines, reranked_matches)
 pretty_print.print_top_results(top_results)
