@@ -19,6 +19,7 @@ SIE_BASE_URL = os.getenv("CLUSTER_URL")
 SIE_API_KEY = os.getenv("API_KEY")
 SIE_RERANK_MODEL = os.getenv("SIE_RERANK_MODEL")
 SIE_EMBEDDING_MODEL = os.getenv("SIE_EMBEDDING_MODEL")
+RERANK_ALPHA = float(os.getenv("RERANK_ALPHA", "0.7"))
 CUSTOM_RERANK_A = float(os.getenv("CUSTOM_RERANK_A", "0.75"))
 CUSTOM_RERANK_NO_REVIEW_PENALTY = float(os.getenv("CUSTOM_RERANK_NO_REVIEW_PENALTY", "0.5"))
 COSINE_TOP_K = 5
@@ -123,6 +124,7 @@ def run_no_review_penalty_test():
         base_url=SIE_BASE_URL,
         model_name=SIE_EMBEDDING_MODEL,
         a=CUSTOM_RERANK_A,
+        alpha=RERANK_ALPHA,
         no_review_penalty=CUSTOM_RERANK_NO_REVIEW_PENALTY,
     )
     custom_results = pretty_print.build_results_frame(wines, custom_matches)
@@ -202,6 +204,7 @@ def main():
         base_url=SIE_BASE_URL,
         model_name=SIE_EMBEDDING_MODEL,
         a=CUSTOM_RERANK_A,
+        alpha=RERANK_ALPHA,
         no_review_penalty=CUSTOM_RERANK_NO_REVIEW_PENALTY,
     )
     custom_results = pretty_print.build_results_frame(wines, custom_matches)

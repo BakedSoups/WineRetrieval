@@ -28,6 +28,7 @@ API_KEY=your-sie-api-key
 RERANK_METHOD=standard
 SIE_RERANK_MODEL=BAAI/bge-reranker-v2-m3
 SIE_EMBEDDING_MODEL=BAAI/bge-m3
+RERANK_ALPHA=0.7
 CUSTOM_RERANK_A=0.75
 CUSTOM_RERANK_NO_REVIEW_PENALTY=0.5
 ```
@@ -35,6 +36,9 @@ CUSTOM_RERANK_NO_REVIEW_PENALTY=0.5
 `RERANK_METHOD` options:
 - `standard`: uses SIE `score(...)` on review texts
 - `custom`: uses generated tasting notes + review embeddings + cosine similarity
+
+`RERANK_ALPHA` mixes the user query vector with the averaged reference-wine vector.
+`CUSTOM_RERANK_A` mixes review embeddings with generated tasting-note embeddings for each wine.
 
 ## Run
 

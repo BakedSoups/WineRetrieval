@@ -10,6 +10,16 @@ from .vectors import normalize_user_preferences, pull_structure
 load_dotenv()
 
 
+def _resolve_custom_rerank_a(a=None):
+    if a is not None:
+        return float(a)
+
+    env_a = os.getenv("CUSTOM_RERANK_A")
+    if env_a is None or env_a == "":
+        return 0.7
+    return float(env_a)
+
+
 def _structure_label(value):
     if value >= 0.8:
         return "high"
@@ -99,13 +109,13 @@ class EmbeddingGenerator:
         *,
         gpu=None,
         provision_timeout_s=900,
-        alpha=0.7,
+        a=0.7,
     ):
         self.client = client
         self.model_name = model_name
         self.gpu = gpu
         self.provision_timeout_s = provision_timeout_s
-        self.alpha = alpha
+        self.a = a
         self.sample_embedding_dim = sample_embedding_dim
 
     def _get_embeddings_batch(self, texts):
@@ -130,7 +140,7 @@ class EmbeddingGenerator:
             return tasting_note_vector
         if tasting_note_vector is None:
             return review_vector
-        return (self.alpha * review_vector) + ((1.0 - self.alpha) * tasting_note_vector)
+        return (self.a * review_vector) + ((1.0 - self.a) * tasting_note_vector)
 
 
 def generate_wine_embeddings(embedding_generator, wines_df):
@@ -187,15 +197,15 @@ def generate_user_query_embedding(embedding_generator, user_query_text):
     return embedding_generator._get_embeddings_batch([user_query_text])[0]
 
 
-def build_final_query_embedding(embedding_generator, user_query_embedding, reference_embeddings):
+def build_final_query_embedding(user_query_embedding, reference_embeddings, alpha):
     if reference_embeddings:
         average_reference_embedding = np.mean(np.vstack(reference_embeddings), axis=0)
     else:
         average_reference_embedding = np.zeros_like(user_query_embedding)
 
     return (
-        embedding_generator.alpha * user_query_embedding
-        + (1.0 - embedding_generator.alpha) * average_reference_embedding
+        alpha * user_query_embedding
+        + (1.0 - alpha) * average_reference_embedding
     )
 
 
@@ -208,6 +218,7 @@ def rerank_wines_with_custom_embeddings(
     base_url=None,
     model_name=None,
     gpu=None,
+    a=None,
     alpha=None,
     no_review_penalty=0.5,
 ):
@@ -217,6 +228,7 @@ def rerank_wines_with_custom_embeddings(
         raise ImportError("sie_sdk is required for custom SIE reranking.") from exc
 
     base_url, api_key = _resolve_sie_connection(base_url)
+    a = _resolve_custom_rerank_a(a)
     alpha = _resolve_rerank_alpha(alpha)
     model_name = model_name or os.getenv("SIE_EMBEDDING_MODEL", "BAAI/bge-m3")
 
@@ -233,7 +245,7 @@ def rerank_wines_with_custom_embeddings(
         len(sample_embedding),
         model_name,
         gpu=gpu,
-        alpha=alpha,
+        a=a,
     )
 
     candidate_wines = wines.iloc[candidate_row_indices].copy()
@@ -254,9 +266,9 @@ def rerank_wines_with_custom_embeddings(
     user_query_text = generate_user_preferences_note(user_preferences)
     user_query_embedding = generate_user_query_embedding(embedding_generator, user_query_text)
     final_query_embedding = build_final_query_embedding(
-        embedding_generator,
         user_query_embedding,
         reference_embeddings,
+        alpha,
     )
 
     wine_scores = []
