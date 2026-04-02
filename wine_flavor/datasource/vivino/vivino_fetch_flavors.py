@@ -64,6 +64,9 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
 
             all_wines.append({
                 "wine_id": wine.get("id"),
+                "vintage_id": vintage.get("id"),
+                "vintage_name": vintage.get("seo_name"),
+                "bottle_label_url": (vintage.get("image") or {}).get("location"),
                 "winery_name": winery.get("seo_name"),
                 "wine_name": wine.get("seo_name"),
                 "vintage_year": vintage.get("year"),

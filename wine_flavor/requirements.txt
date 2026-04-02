@@ -1,5 +1,6 @@
 certifi==2026.2.25
 charset-normalizer==3.4.6
+chromadb==1.2.1
 idna==3.11
 numpy==2.4.3
 pandas==3.0.1

@@ -43,7 +43,9 @@ def main():
         print(f"Error: {exc}", flush=True)
         raise
 
-    dense_vector = result.get("dense") or []
+    dense_vector = result.get("dense")
+    if dense_vector is None:
+        dense_vector = []
     print("SIE warmup completed.", flush=True)
     print(f"Dense vector length: {len(dense_vector)}")
 

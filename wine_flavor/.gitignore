@@ -1,4 +1,2 @@
 venv/
 .env
-data/chroma/
-chroma.sqlite3
