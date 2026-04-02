@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 def _require_env(name):
     value = os.getenv(name)
     if value is None or value == "":
@@ -26,14 +27,17 @@ def _require_float_env(name, fallback_name=None):
     return float(value)
 
 
-SIE_BASE_URL = _require_env("CLUSTER_URL")
-SIE_API_KEY = _require_env("API_KEY")
-RERANK_METHOD = _require_env("RERANK_METHOD")
-SIE_RERANK_MODEL = _require_env("SIE_RERANK_MODEL")
-SIE_EMBEDDING_MODEL = _require_env("SIE_EMBEDDING_MODEL")
-RERANK_ALPHA = _require_float_env("RERANK_ALPHA")
-CUSTOM_RERANK_A = _require_float_env("CUSTOM_RERANK_A")
-CUSTOM_RERANK_NO_REVIEW_PENALTY = float(_require_env("CUSTOM_RERANK_NO_REVIEW_PENALTY"))
+try:
+    SIE_BASE_URL = _require_env("CLUSTER_URL")
+    SIE_API_KEY = _require_env("API_KEY")
+    RERANK_METHOD = _require_env("RERANK_METHOD")
+    SIE_RERANK_MODEL = _require_env("SIE_RERANK_MODEL")
+    SIE_EMBEDDING_MODEL = _require_env("SIE_EMBEDDING_MODEL")
+    RERANK_ALPHA = _require_float_env("RERANK_ALPHA")
+    CUSTOM_RERANK_A = _require_float_env("CUSTOM_RERANK_A")
+    CUSTOM_RERANK_NO_REVIEW_PENALTY = float(_require_env("CUSTOM_RERANK_NO_REVIEW_PENALTY"))
+except ValueError as exc:
+    raise ValueError(f"{exc}. Add it to your .env file.") from exc
 ALLOWED_SIE_RERANK_MODELS = {
     "BAAI/bge-reranker-v2-m3",
     "jinaai/jina-reranker-v2-base-multilingual",
