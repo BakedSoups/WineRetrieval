@@ -4,7 +4,8 @@ import numpy as np
 from dotenv import load_dotenv
 from sklearn.metrics.pairwise import cosine_similarity
 
-from .sie_rerank import _resolve_sie_connection, pull_wine_reviews
+from .sie_rerank import _resolve_rerank_alpha, _resolve_sie_connection, pull_wine_reviews
+from .vectors import normalize_user_preferences, pull_structure
 
 load_dotenv()
 
@@ -46,14 +47,11 @@ def generate_tasting_note(wine_row):
             flavor_parts.append(f"{_flavor_label(normalized_count)} {flavor_name}")
 
     structure_parts = []
-    for structure_name, structure_value in [
-        ("acidity", wine_row.get("taste_acidity")),
-        ("fizziness", wine_row.get("taste_fizziness")),
-        ("intensity", wine_row.get("taste_intensity")),
-        ("sweetness", wine_row.get("taste_sweetness")),
-        ("tannin", wine_row.get("taste_tannin")),
-    ]:
-        normalized_value = 0.5 if structure_value is None else float(structure_value) / 5.0
+    structure_values = pull_structure(wine_row)
+    for structure_name, normalized_value in zip(
+        ["acidity", "fizziness", "intensity", "sweetness", "tannin"],
+        structure_values,
+    ):
         structure_parts.append(f"{_structure_label(normalized_value)} {structure_name}")
 
     structure_text = ", ".join(structure_parts)
@@ -68,15 +66,17 @@ def generate_tasting_note(wine_row):
 
 
 def generate_user_preferences_note(user_preferences):
-    user_flavors = user_preferences.get("flavors", {})
-    user_structure = user_preferences.get("structure", {})
+    normalized_preferences = normalize_user_preferences(user_preferences)
+    user_flavors = normalized_preferences["flavors"]
+    user_structure = normalized_preferences["structure"]
 
     flavor_parts = []
     for flavor_name, flavor_value in sorted(user_flavors.items()):
         flavor_parts.append(f"{_flavor_label(float(flavor_value))} {flavor_name}")
 
     structure_parts = []
-    for structure_name, structure_value in user_structure.items():
+    for structure_name in ["acidity", "fizziness", "intensity", "sweetness", "tannin"]:
+        structure_value = user_structure[structure_name]
         structure_parts.append(f"{_structure_label(float(structure_value))} {structure_name}")
 
     structure_text = ", ".join(structure_parts)
@@ -99,13 +99,13 @@ class EmbeddingGenerator:
         *,
         gpu=None,
         provision_timeout_s=900,
-        a=0.75,
+        alpha=0.7,
     ):
         self.client = client
         self.model_name = model_name
         self.gpu = gpu
         self.provision_timeout_s = provision_timeout_s
-        self.a = a
+        self.alpha = alpha
         self.sample_embedding_dim = sample_embedding_dim
 
     def _get_embeddings_batch(self, texts):
@@ -130,7 +130,7 @@ class EmbeddingGenerator:
             return tasting_note_vector
         if tasting_note_vector is None:
             return review_vector
-        return (self.a * review_vector) + ((1.0 - self.a) * tasting_note_vector)
+        return (self.alpha * review_vector) + ((1.0 - self.alpha) * tasting_note_vector)
 
 
 def generate_wine_embeddings(embedding_generator, wines_df):
@@ -187,15 +187,28 @@ def generate_user_query_embedding(embedding_generator, user_query_text):
     return embedding_generator._get_embeddings_batch([user_query_text])[0]
 
 
+def build_final_query_embedding(embedding_generator, user_query_embedding, reference_embeddings):
+    if reference_embeddings:
+        average_reference_embedding = np.mean(np.vstack(reference_embeddings), axis=0)
+    else:
+        average_reference_embedding = np.zeros_like(user_query_embedding)
+
+    return (
+        embedding_generator.alpha * user_query_embedding
+        + (1.0 - embedding_generator.alpha) * average_reference_embedding
+    )
+
+
 def rerank_wines_with_custom_embeddings(
     wines,
     candidate_row_indices,
     user_preferences,
     *,
+    reference_row_indices=None,
     base_url=None,
     model_name=None,
     gpu=None,
-    a=0.75,
+    alpha=None,
     no_review_penalty=0.5,
 ):
     try:
@@ -204,6 +217,7 @@ def rerank_wines_with_custom_embeddings(
         raise ImportError("sie_sdk is required for custom SIE reranking.") from exc
 
     base_url, api_key = _resolve_sie_connection(base_url)
+    alpha = _resolve_rerank_alpha(alpha)
     model_name = model_name or os.getenv("SIE_EMBEDDING_MODEL", "BAAI/bge-m3")
 
     client = SIEClient(base_url, api_key=api_key)
@@ -219,7 +233,7 @@ def rerank_wines_with_custom_embeddings(
         len(sample_embedding),
         model_name,
         gpu=gpu,
-        a=a,
+        alpha=alpha,
     )
 
     candidate_wines = wines.iloc[candidate_row_indices].copy()
@@ -228,14 +242,28 @@ def rerank_wines_with_custom_embeddings(
     candidate_wines = generate_wine_embeddings(embedding_generator, candidate_wines)
     candidate_wines = combine_wine_embeddings(embedding_generator, candidate_wines)
 
+    reference_embeddings = []
+    if reference_row_indices:
+        reference_wines = wines.iloc[reference_row_indices].copy()
+        reference_wines["tasting_notes"] = reference_wines.apply(generate_tasting_note, axis=1)
+        reference_wines["wine_reviews_normalized"] = reference_wines.apply(pull_wine_reviews, axis=1)
+        reference_wines = generate_wine_embeddings(embedding_generator, reference_wines)
+        reference_wines = combine_wine_embeddings(embedding_generator, reference_wines)
+        reference_embeddings = reference_wines["combined_embedding"].tolist()
+
     user_query_text = generate_user_preferences_note(user_preferences)
     user_query_embedding = generate_user_query_embedding(embedding_generator, user_query_text)
+    final_query_embedding = build_final_query_embedding(
+        embedding_generator,
+        user_query_embedding,
+        reference_embeddings,
+    )
 
     wine_scores = []
     for local_index, row_index in enumerate(candidate_row_indices):
         combined_wine_vector = candidate_wines.iloc[local_index]["combined_embedding"]
 
-        score = float(cosine_similarity([user_query_embedding], [combined_wine_vector])[0][0])
+        score = float(cosine_similarity([final_query_embedding], [combined_wine_vector])[0][0])
         review_count = len(candidate_wines.iloc[local_index]["wine_reviews_normalized"])
         if np.all(candidate_wines.iloc[local_index]["review_embedding"] == 0):
             score *= float(no_review_penalty)
@@ -251,6 +279,6 @@ def rerank_wines_with_custom_embeddings(
     ranked_wines = sorted(wine_scores, key=lambda item: item["rerank_score"], reverse=True)
     for rank, wine_score in enumerate(ranked_wines):
         wine_score["rerank_rank"] = rank
-        wine_score["query_vector_length"] = int(len(user_query_embedding))
+        wine_score["query_vector_length"] = int(len(final_query_embedding))
 
     return ranked_wines

@@ -2,6 +2,43 @@ import numpy as np
 import pandas as pd
 
 
+STRUCTURE_NAMES = ["acidity", "fizziness", "intensity", "sweetness", "tannin"]
+
+
+def normalize_preference_value(value, default=0.5):
+    if value is None or pd.isna(value):
+        return float(default)
+
+    normalized_value = float(value)
+    if normalized_value < 0.0:
+        return 0.0
+    if normalized_value > 1.0:
+        return 1.0
+    return normalized_value
+
+
+def normalize_user_preferences(user_preferences):
+    structure_preferences = user_preferences.get("structure", {})
+    flavor_preferences = user_preferences.get("flavors", {})
+
+    normalized_structure = {
+        structure_name: normalize_preference_value(
+            structure_preferences.get(structure_name, 0.5),
+            default=0.5,
+        )
+        for structure_name in STRUCTURE_NAMES
+    }
+    normalized_flavors = {
+        flavor_name: normalize_preference_value(flavor_value, default=0.0)
+        for flavor_name, flavor_value in flavor_preferences.items()
+    }
+
+    return {
+        "structure": normalized_structure,
+        "flavors": normalized_flavors,
+    }
+
+
 def pull_structure(wine_row):
     def normalize_taste(value, default=2.5):
         if pd.isna(value):
@@ -81,8 +118,9 @@ def build_wine_vector(wine_row, all_flavors, flavor_idf=None):
 
 
 def build_user_vector(user_preferences, all_flavors, flavor_idf=None):
-    structure_preferences = user_preferences.get("structure", {})
-    flavor_preferences = user_preferences.get("flavors", {})
+    normalized_preferences = normalize_user_preferences(user_preferences)
+    structure_preferences = normalized_preferences["structure"]
+    flavor_preferences = normalized_preferences["flavors"]
 
     structure_vector = np.array([
         structure_preferences.get("acidity", 0.5),

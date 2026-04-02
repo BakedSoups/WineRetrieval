@@ -15,12 +15,23 @@ def _require_env(name):
     return value
 
 
+def _require_float_env(name, fallback_name=None):
+    value = os.getenv(name)
+    if (value is None or value == "") and fallback_name:
+        value = os.getenv(fallback_name)
+    if value is None or value == "":
+        if fallback_name:
+            raise ValueError(f"Missing required environment variable: {name} (or legacy {fallback_name})")
+        raise ValueError(f"Missing required environment variable: {name}")
+    return float(value)
+
+
 SIE_BASE_URL = _require_env("CLUSTER_URL")
 SIE_API_KEY = _require_env("API_KEY")
 RERANK_METHOD = _require_env("RERANK_METHOD")
 SIE_RERANK_MODEL = _require_env("SIE_RERANK_MODEL")
 SIE_EMBEDDING_MODEL = _require_env("SIE_EMBEDDING_MODEL")
-CUSTOM_RERANK_A = float(_require_env("CUSTOM_RERANK_A"))
+RERANK_ALPHA = _require_float_env("RERANK_ALPHA", fallback_name="CUSTOM_RERANK_A")
 CUSTOM_RERANK_NO_REVIEW_PENALTY = float(_require_env("CUSTOM_RERANK_NO_REVIEW_PENALTY"))
 ALLOWED_SIE_RERANK_MODELS = {
     "BAAI/bge-reranker-v2-m3",
@@ -84,9 +95,10 @@ if RERANK_METHOD == "custom":
         wines,
         candidate_row_indices,
         user_preferences,
+        reference_row_indices=REFERENCE_ROW_INDICES,
         base_url=SIE_BASE_URL,
         model_name=SIE_EMBEDDING_MODEL,
-        a=CUSTOM_RERANK_A,
+        alpha=RERANK_ALPHA,
         no_review_penalty=CUSTOM_RERANK_NO_REVIEW_PENALTY,
     )
 else:
@@ -97,6 +109,7 @@ else:
         unique_flavors,
         flavor_idf,
         reference_row_indices=REFERENCE_ROW_INDICES,
+        alpha=RERANK_ALPHA,
         max_terms=RERANK_MAX_TERMS,
         base_url=SIE_BASE_URL,
         model_name=SIE_RERANK_MODEL,
