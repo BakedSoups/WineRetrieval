@@ -271,6 +271,9 @@ def _load_detected_wine_from_db(wine_id):
 
 
 def _select_detected_wine_record(wines, detected_wine_id=None):
+    if detected_wine_id is None:
+        return None
+
     if wines is not None and not wines.empty and detected_wine_id is not None:
         matches = wines[wines["wine_id"] == detected_wine_id]
         if not matches.empty:
@@ -280,10 +283,7 @@ def _select_detected_wine_record(wines, detected_wine_id=None):
     if db_record is not None:
         return db_record
 
-    if wines is None or wines.empty:
-        raise HTTPException(status_code=503, detail="Wine catalog is not loaded.")
-
-    return _catalog_wine_record(wines.iloc[0])
+    return None
 
 
 def _build_flavor_tags(wines):

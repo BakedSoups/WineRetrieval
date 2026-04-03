@@ -1,6 +1,11 @@
-from dataclasses import dataclass
+from __future__ import annotations
 
-DEMO_DETECTED_WINE_ID = 618
+from dataclasses import dataclass
+from io import BytesIO
+
+from PIL import Image, UnidentifiedImageError
+
+from .textract import match_label, preprocess, textract
 
 
 @dataclass
@@ -11,10 +16,27 @@ class DetectedWine:
 
 
 def detect_wine_from_image_bytes(image_bytes: bytes) -> DetectedWine:
-    # Placeholder detector for the image-detection demo path.
-    # The uploaded image is accepted but intentionally ignored.
+    if not image_bytes:
+        return DetectedWine(wine_id=None, confidence=0.0, detection_method="empty-image")
+
+    try:
+        image = Image.open(BytesIO(image_bytes))
+        image.load()
+    except (UnidentifiedImageError, OSError):
+        return DetectedWine(wine_id=None, confidence=0.0, detection_method="invalid-image")
+
+    try:
+        extracted_text = textract(preprocess(image))
+        matched_labels = match_label(extracted_text, top_n=1)
+    except Exception:
+        return DetectedWine(wine_id=None, confidence=0.0, detection_method="ocr-error")
+
+    if not matched_labels:
+        return DetectedWine(wine_id=None, confidence=0.0, detection_method="sie-florence-no-match")
+
+    best_match = matched_labels[0]
     return DetectedWine(
-        wine_id=DEMO_DETECTED_WINE_ID,
-        confidence=0.99 if image_bytes else 0.0,
-        detection_method="placeholder-fixed-wine",
+        wine_id=int(best_match["wine_id"]) if best_match.get("wine_id") is not None else None,
+        confidence=max(0.0, min(1.0, float(best_match.get("match_score", 0.0)) / 100.0)),
+        detection_method="sie-florence-fuzzy-match",
     )

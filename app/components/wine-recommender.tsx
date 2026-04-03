@@ -23,6 +23,7 @@ import {
   X,
   RotateCcw,
   Camera,
+  Upload,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -64,8 +65,11 @@ export function WineRecommender() {
   const [isRecommendationsLoading, setIsRecommendationsLoading] = useState(false)
   const [isDetectingWine, setIsDetectingWine] = useState(false)
   const [detectedWine, setDetectedWine] = useState<Wine | null>(null)
+  const [detectionConfidence, setDetectionConfidence] = useState<number | null>(null)
+  const [detectionMethod, setDetectionMethod] = useState<string>("")
   const [errorMessage, setErrorMessage] = useState<string>("")
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
+  const photoLibraryInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -109,6 +113,8 @@ export function WineRecommender() {
   const handleSelectWineFromSearch = (wineId: string) => {
     setSelectedReferenceWine(wineId)
     setDetectedWine(catalogWines.find((wine) => wine.id === wineId) ?? null)
+    setDetectionConfidence(null)
+    setDetectionMethod("")
     setWineSearchQuery("")
     setWineSearchFocused(false)
   }
@@ -131,6 +137,9 @@ export function WineRecommender() {
   const handleResetStructure = () => {
     setStructure(defaultStructure)
     setSelectedReferenceWine("")
+    setDetectedWine(null)
+    setDetectionConfidence(null)
+    setDetectionMethod("")
   }
 
   const handleFlavorToggle = (flavor: string) => {
@@ -220,7 +229,11 @@ export function WineRecommender() {
     cameraInputRef.current?.click()
   }
 
-  const handleCameraImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePickPhotoLibraryImage = () => {
+    photoLibraryInputRef.current?.click()
+  }
+
+  const handleImageSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ""
     if (!file) return
@@ -228,9 +241,20 @@ export function WineRecommender() {
     try {
       setIsDetectingWine(true)
       setErrorMessage("")
+      setDetectedWine(null)
+      setSelectedReferenceWine("")
+      setDetectionConfidence(null)
+      setDetectionMethod("")
 
       const response = await detectWineFromImage(file)
       const detected = response.detected_wine
+      setDetectionConfidence(response.confidence)
+      setDetectionMethod(response.detection_method)
+
+      if (!detected) {
+        setErrorMessage("No wine match found for that image. Try a clearer label photo or pick the wine manually.")
+        return
+      }
 
       setDetectedWine(detected)
       setSelectedReferenceWine(detected.id)
@@ -489,7 +513,12 @@ export function WineRecommender() {
                 </h3>
                 {selectedReferenceWine && (
                   <button
-                    onClick={() => setSelectedReferenceWine("")}
+                    onClick={() => {
+                      setSelectedReferenceWine("")
+                      setDetectedWine(null)
+                      setDetectionConfidence(null)
+                      setDetectionMethod("")
+                    }}
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
                     Clear
@@ -503,28 +532,61 @@ export function WineRecommender() {
                 accept="image/*"
                 capture="environment"
                 className="hidden"
-                onChange={handleCameraImageChange}
+                onChange={handleImageSelection}
               />
 
-              <button
-                onClick={handlePickCameraImage}
-                disabled={isCatalogLoading || isDetectingWine}
-                className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isDetectingWine ? (
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                ) : (
-                  <Camera className="h-4 w-4 text-primary" />
-                )}
-                <span>{isDetectingWine ? "Detecting bottle..." : "Take a photo of a wine bottle"}</span>
-              </button>
+              <input
+                ref={photoLibraryInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageSelection}
+              />
 
-              {detectedWine && (
+              <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                <button
+                  onClick={handlePickCameraImage}
+                  disabled={isCatalogLoading || isDetectingWine}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isDetectingWine ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  ) : (
+                    <Camera className="h-4 w-4 text-primary" />
+                  )}
+                  <span>{isDetectingWine ? "Detecting..." : "Take photo"}</span>
+                </button>
+
+                <button
+                  onClick={handlePickPhotoLibraryImage}
+                  disabled={isCatalogLoading || isDetectingWine}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Upload className="h-4 w-4 text-primary" />
+                  <span>Upload image</span>
+                </button>
+              </div>
+
+              {(detectedWine || detectionMethod) && (
                 <div className="mb-4 rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-sm">
-                  <p className="font-medium text-foreground">Detected wine</p>
-                  <p className="text-muted-foreground">
-                    {detectedWine.name} {detectedWine.vintage ? `· ${detectedWine.vintage}` : ""}
+                  <p className="font-medium text-foreground">
+                    {detectedWine ? "Detected wine" : "OCR finished"}
                   </p>
+                  {detectedWine ? (
+                    <p className="text-muted-foreground">
+                      {detectedWine.name} {detectedWine.vintage ? `· ${detectedWine.vintage}` : ""}
+                    </p>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      No catalog match found from the uploaded image.
+                    </p>
+                  )}
+                  {detectionConfidence !== null && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Confidence: {Math.round(detectionConfidence * 100)}%
+                      {detectionMethod ? ` · ${detectionMethod}` : ""}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -540,7 +602,12 @@ export function WineRecommender() {
                     </p>
                   </div>
                   <button
-                    onClick={() => setSelectedReferenceWine("")}
+                    onClick={() => {
+                      setSelectedReferenceWine("")
+                      setDetectedWine(null)
+                      setDetectionConfidence(null)
+                      setDetectionMethod("")
+                    }}
                     className="p-1.5 rounded-full hover:bg-muted transition-colors"
                   >
                     <X className="h-4 w-4 text-muted-foreground" />
