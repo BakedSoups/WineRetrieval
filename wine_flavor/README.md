@@ -1,67 +1,71 @@
-# wine_flavor
+# Wine Flavor
 
-Wine retrieval experiments built on Vivino data.
+Prototype wine recommender using:
+- Vivino wine metadata
+- in-memory vector retrieval
+- SIE-based reranking
 
 ## Setup
 
-Assume you want this layout:
+Create a virtualenv, activate it, and install dependencies:
 
 ```bash
-cd ~/code/pp
-git clone <your-sie-repo-url> sie
-git clone <your-wine-retrieval-repo-url> WineRetrieval
-cd WineRetrieval/wine_flavor
-python3.12 -m venv venv
+python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-pip install -e ../../sie/packages/sie_sdk
-pip install -e ../../sie/packages/sie_server
+```
+note: we have sie_sdk in this requirements.txt you may need to install separately if you have issues with the installation. 
+```bash
+pip install sie_sdk
+```
+## Env
+
+Create a `.env` file with:
+
+```env
+CLUSTER_URL=https://your-sie-cluster-url
+API_KEY=your-sie-api-key
+RERANK_METHOD=standard
+SIE_RERANK_MODEL=BAAI/bge-reranker-v2-m3
+SIE_EMBEDDING_MODEL=BAAI/bge-m3
+RERANK_ALPHA=0.7
+CUSTOM_RERANK_A=0.75
+CUSTOM_RERANK_NO_REVIEW_PENALTY=0.5
 ```
 
-Create your environment file:
+`RERANK_METHOD` options:
+- `standard`: uses SIE `score(...)` on review texts
+- `custom`: uses generated tasting notes + review embeddings + cosine similarity
+
+`RERANK_ALPHA` mixes the user query vector with the averaged reference-wine vector.
+`CUSTOM_RERANK_A` mixes review embeddings with generated tasting-note embeddings for each wine.
+
+User preferences are expected to come from the UI already normalized. The engine assumes:
+- `structure` contains `acidity`, `fizziness`, `intensity`, `sweetness`, and `tannin`
+- all structure and flavor values are numeric floats on the normalized 0-1 scale
+- `flavors` is a mapping of flavor name to normalized weight
+
+## Run
+
+Run the prototype:
 
 ```bash
-cd ~/code/pp/WineRetrieval/wine_flavor
-cp .env.example .env
-```
-
-Then set these values in `.env`:
-
-- `CLUSTER_URL`: the SIE server or cluster URL to use
-- `API_KEY`: the API key for that SIE server
-
-Run the project:
-
-```bash
-cd ~/code/pp/WineRetrieval/wine_flavor
-source venv/bin/activate
 python main.py
 ```
 
-If you want to use a local SIE server instead of a hosted cluster, set `CLUSTER_URL=http://localhost:8080` in `.env` and start it separately:
+## Tests
+
+Compare the two rerank methods on the same candidate set:
 
 ```bash
-cd ~/code/pp/WineRetrieval/wine_flavor
-source venv/bin/activate
-sie-server serve
+python test/compare_rerank_methods.py
 ```
 
-## main.py
-
-[`main.py`](/home/alex/code/pp/WineRetrieval/wine_flavor/main.py) is the main hub of operations.
-
-It does six things:
-
-1. Fetches wines from Vivino with `datasource.fetch_vivino_wines(...)`.
-2. Fetches English reviews for those wines with `datasource.attach_vivino_reviews(...)`.
-3. Builds the shared flavor vocabulary with `transforms.unique_flavors(...)`.
-4. Defines the editable `user_preferences` dictionary.
-5. Builds the wine matrix and user vector through `engine`.
-6. Runs cosine candidate retrieval, then review-based SIE reranking, then prints the top matches.
-
-The main things you will edit in [`main.py`](/home/alex/code/pp/WineRetrieval/wine_flavor/main.py) are:
-
-- `SIE_RERANK_MODEL`
-- `user_preferences`
-
-The SIE server selection is now driven by `.env`, not hardcoded in `main.py`.
+## Flow
+1. Fetch wines from Vivino
+2. Fetch reviews for retrieved wines
+3. Build wine vectors from structure + flavors
+4. Retrieve top candidates with cosine similarity
+5. Rerank with either:
+   - standard SIE reranker
+   - custom embedding reranker
