@@ -193,10 +193,11 @@ def _field_score(query: str, target: str) -> float:
     # Jaccard: intersection / union — penalizes both missing and extra words
     coverage = len(query_tokens & target_tokens) / len(query_tokens | target_tokens)
     
-    fuzzy = fuzz.token_sort_ratio(query.lower(), target.lower())
+    # Sorts the strings to correct for OCR
+    sorted_fuzzy_score = fuzz.token_sort_ratio(query.lower(), target.lower())
 
     # 60% coverage, 40% fuzzy — adjust if OCR quality is poor
-    return (fuzzy * 0.4) + (coverage * 100 * 0.6)
+    return (sorted_fuzzy_score * 0.4) + (coverage * 100 * 0.6)
 
 def score_wine(wine: dict, entities: list[str]) -> float:
     """For each entity, take its best score across all DB fields, then average across entities.
