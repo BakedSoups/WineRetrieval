@@ -188,8 +188,15 @@ export function WineRecommender() {
 
       const flavorWeights = Object.fromEntries(selectedFlavors.map((flavor) => [flavor, 1.0]))
       const referenceRowIndices = referenceWine ? [referenceWine.row_index] : []
+      const normalizedStructure = {
+        acidity: structure.acidity / 100,
+        fizziness: structure.fizziness / 100,
+        intensity: structure.intensity / 100,
+        sweetness: structure.sweetness / 100,
+        tannin: structure.tannin / 100,
+      }
       const response = await fetchRecommendations({
-        structure,
+        structure: normalizedStructure,
         flavors: flavorWeights,
         reference_row_indices: referenceRowIndices,
         top_k: 12,

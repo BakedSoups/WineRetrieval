@@ -7,21 +7,16 @@ Prototype wine recommender using:
 
 ## Setup
 
-Create a virtualenv, activate it, and install dependencies:
+Install Docker and Docker Compose.
+
+Create a `.env` file with the required backend settings, then run the stack with Docker Compose.
+
+Start:
 
 ```bash
-./setup.sh
+docker compose up --build
 ```
 
-This script:
-- creates `wine_flavor/venv` if it does not exist
-- installs backend Python dependencies
-- installs frontend dependencies in `frontend/react_app`
-
-note: we have sie_sdk in this requirements.txt you may need to install separately if you have issues with the installation.
-```bash
-pip install sie_sdk
-```
 ## Env
 
 Create a `.env` file with:
@@ -56,23 +51,24 @@ User preferences are expected to come from the UI already normalized. The engine
 Run the demo stack:
 
 ```bash
-./start_demo.sh
+docker compose up --build
+```
+
+Stop it with:
+
+```bash
+docker compose down
 ```
 
 This starts:
 - FastAPI on `http://localhost:8000`
-- the React frontend on `http://localhost:3001`
+- the React frontend on `http://localhost:3000`
 
-Logs and PID files are written under `wine_flavor/.run/`.
+Docker Compose runs:
+- a FastAPI backend container on `http://localhost:8000`
+- a Next.js frontend container on `http://localhost:3000`
 
-If the frontend dependencies are missing, run:
-
-```bash
-cd frontend/react_app
-npm install
-```
-
-`app.py` is still the backend entrypoint used by the startup script. It preloads a small in-memory demo catalog from Vivino, and the React frontend calls the FastAPI endpoints directly.
+`app.py` is still the backend entrypoint inside the backend container. It preloads a small in-memory demo catalog from Vivino, and the React frontend calls the FastAPI endpoints directly.
 
 `DEMO_NUM_PAGES` controls how many Vivino pages are fetched at startup.
 `DEMO_MAX_WINES` caps the in-memory catalog after fetch so the demo stays small.
