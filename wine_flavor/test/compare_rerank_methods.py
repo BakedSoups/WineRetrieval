@@ -15,13 +15,36 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SIE_BASE_URL = os.getenv("CLUSTER_URL")
-SIE_API_KEY = os.getenv("API_KEY")
-SIE_RERANK_MODEL = os.getenv("SIE_RERANK_MODEL")
-SIE_EMBEDDING_MODEL = os.getenv("SIE_EMBEDDING_MODEL")
-RERANK_ALPHA = float(os.getenv("RERANK_ALPHA"))
-CUSTOM_RERANK_A = float(os.getenv("CUSTOM_RERANK_A"))
-CUSTOM_RERANK_NO_REVIEW_PENALTY = float(os.getenv("CUSTOM_RERANK_NO_REVIEW_PENALTY", "0.5"))
+
+def _require_env(name):
+    value = os.getenv(name)
+    if value is None or value == "":
+        raise ValueError(f"Missing required environment variable: {name}")
+    return value
+
+
+def _require_float_env(name, fallback_name=None):
+    value = os.getenv(name)
+    if (value is None or value == "") and fallback_name:
+        value = os.getenv(fallback_name)
+    if value is None or value == "":
+        if fallback_name:
+            raise ValueError(f"Missing required environment variable: {name} (or legacy {fallback_name})")
+        raise ValueError(f"Missing required environment variable: {name}")
+    return float(value)
+
+
+try:
+    SIE_BASE_URL = _require_env("CLUSTER_URL")
+    SIE_API_KEY = _require_env("API_KEY")
+    SIE_RERANK_MODEL = _require_env("SIE_RERANK_MODEL")
+    SIE_EMBEDDING_MODEL = _require_env("SIE_EMBEDDING_MODEL")
+    RERANK_ALPHA = _require_float_env("RERANK_ALPHA")
+    CUSTOM_RERANK_A = _require_float_env("CUSTOM_RERANK_A")
+    CUSTOM_RERANK_NO_REVIEW_PENALTY = float(_require_env("CUSTOM_RERANK_NO_REVIEW_PENALTY"))
+except ValueError as exc:
+    raise ValueError(f"{exc}. Add it to your .env file.") from exc
+
 COSINE_TOP_K = 5
 REVIEWS_PER_WINE = 5
 RERANK_MAX_TERMS = 12
@@ -42,20 +65,6 @@ USER_PREFERENCES = {
         "floral": 0.6,
     },
 }
-
-
-def validate_config():
-    required = {
-        "CLUSTER_URL": SIE_BASE_URL,
-        "API_KEY": SIE_API_KEY,
-        "SIE_RERANK_MODEL": SIE_RERANK_MODEL,
-        "SIE_EMBEDDING_MODEL": SIE_EMBEDDING_MODEL,
-    }
-    missing = [name for name, value in required.items() if not value]
-    if missing:
-        raise ValueError(f"Missing required environment variable(s): {', '.join(missing)}")
-
-
 def run_no_review_penalty_test():
     wines = pd.DataFrame(
         [
@@ -140,8 +149,6 @@ def run_no_review_penalty_test():
 
 
 def main():
-    validate_config()
-
     print("User query:")
     print(
         "- structure:",
