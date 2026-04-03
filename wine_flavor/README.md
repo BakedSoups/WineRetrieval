@@ -40,6 +40,11 @@ CUSTOM_RERANK_NO_REVIEW_PENALTY=0.5
 `RERANK_ALPHA` mixes the user query vector with the averaged reference-wine vector.
 `CUSTOM_RERANK_A` mixes review embeddings with generated tasting-note embeddings for each wine.
 
+User preferences are expected to come from the UI already normalized. The engine assumes:
+- `structure` contains `acidity`, `fizziness`, `intensity`, `sweetness`, and `tannin`
+- all structure and flavor values are numeric floats on the normalized 0-1 scale
+- `flavors` is a mapping of flavor name to normalized weight
+
 ## Run
 
 Run the prototype:

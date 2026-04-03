@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from sklearn.metrics.pairwise import cosine_similarity
 
 from .sie_rerank import _resolve_sie_connection, pull_wine_reviews
-from .vectors import normalize_user_preferences, pull_structure
+from .vectors import pull_structure
 
 load_dotenv()
 
@@ -66,17 +66,15 @@ def generate_tasting_note(wine_row):
 
 
 def generate_user_preferences_note(user_preferences):
-    normalized_preferences = normalize_user_preferences(user_preferences)
-    user_flavors = normalized_preferences["flavors"]
-    user_structure = normalized_preferences["structure"]
+    user_flavors = user_preferences["flavors"]
+    user_structure = user_preferences["structure"]
 
     flavor_parts = []
     for flavor_name, flavor_value in sorted(user_flavors.items()):
         flavor_parts.append(f"{_flavor_label(float(flavor_value))} {flavor_name}")
 
     structure_parts = []
-    for structure_name in ["acidity", "fizziness", "intensity", "sweetness", "tannin"]:
-        structure_value = user_structure[structure_name]
+    for structure_name, structure_value in user_structure.items():
         structure_parts.append(f"{_structure_label(float(structure_value))} {structure_name}")
 
     structure_text = ", ".join(structure_parts)

@@ -5,35 +5,6 @@ import pandas as pd
 STRUCTURE_NAMES = ["acidity", "fizziness", "intensity", "sweetness", "tannin"]
 
 
-def normalize_preference_value(value, default=0.5):
-    if value is None or pd.isna(value):
-        return float(default)
-
-    return float(value)
-
-
-def normalize_user_preferences(user_preferences):
-    structure_preferences = user_preferences.get("structure", {})
-    flavor_preferences = user_preferences.get("flavors", {})
-
-    normalized_structure = {
-        structure_name: normalize_preference_value(
-            structure_preferences.get(structure_name, 0.5),
-            default=0.5,
-        )
-        for structure_name in STRUCTURE_NAMES
-    }
-    normalized_flavors = {
-        flavor_name: normalize_preference_value(flavor_value, default=0.0)
-        for flavor_name, flavor_value in flavor_preferences.items()
-    }
-
-    return {
-        "structure": normalized_structure,
-        "flavors": normalized_flavors,
-    }
-
-
 def pull_structure(wine_row):
     def normalize_taste(value, default=2.5):
         if pd.isna(value):
@@ -113,23 +84,22 @@ def build_wine_vector(wine_row, all_flavors, flavor_idf=None):
 
 
 def build_user_vector(user_preferences, all_flavors, flavor_idf=None):
-    normalized_preferences = normalize_user_preferences(user_preferences)
-    structure_preferences = normalized_preferences["structure"]
-    flavor_preferences = normalized_preferences["flavors"]
+    structure_preferences = user_preferences["structure"]
+    flavor_preferences = user_preferences["flavors"]
 
     structure_vector = np.array([
-        structure_preferences.get("acidity", 0.5),
-        structure_preferences.get("fizziness", 0.5),
-        structure_preferences.get("intensity", 0.5),
-        structure_preferences.get("sweetness", 0.5),
-        structure_preferences.get("tannin", 0.5),
+        float(structure_preferences["acidity"]),
+        float(structure_preferences["fizziness"]),
+        float(structure_preferences["intensity"]),
+        float(structure_preferences["sweetness"]),
+        float(structure_preferences["tannin"]),
     ])
 
     flavor_vector = np.zeros(len(all_flavors))
 
     for i, flavor_name in enumerate(all_flavors):
         if flavor_name in flavor_preferences:
-            flavor_weight = flavor_preferences[flavor_name]
+            flavor_weight = float(flavor_preferences[flavor_name])
             if flavor_idf is not None:
                 flavor_weight *= flavor_idf.get(flavor_name, 1.0)
             flavor_vector[i] = flavor_weight
