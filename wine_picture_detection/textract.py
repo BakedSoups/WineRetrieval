@@ -1,4 +1,6 @@
 
+""" Extract text from a wine label and fuzzy match against database """
+
 import math
 import numpy as np
 from PIL import Image
@@ -9,7 +11,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sie_sdk import SIEClient, Item
 import re
-import json
 import sqlite3
 from rapidfuzz import fuzz
 
@@ -18,6 +19,12 @@ load_dotenv(Path(__file__).parent.parent / "wine_flavor" / ".env")
 DATABASE_PATH = os.getenv("DATABASE_PATH", "wine_flavor.db")
 TOP_N = int(os.getenv("TOP_N", 5))
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 0))
+SIE_OCR_MODEL = os.getenv("SIE_OCR_MODEL")
+ALLOWED_OCR_MODELS = os.getenv("ALLOWED_OCR_MODELS")
+CLUSTER_URL = os.getenv("CLUSTER_URL")
+API_KEY = os.getenv("API_KEY")
+GPU = os.getenv("GPU")
+PROVISION_TIMEOUT_S = int(os.getenv("PROVISION_TIMEOUT_S"))
 DB_FIELDS = ["wine_name", "winery_name", "region_name", "country_name"]
 
 # Image quality check >>>
@@ -129,17 +136,11 @@ def preprocess(image: Image.Image) -> Image.Image:
 # Text Extraction >>>
 
 def textract(image: Image.Image):
-	
-    sie_client = SIEClient(os.getenv("CLUSTER_URL"), api_key=os.getenv("API_KEY"))
-
-    result = sie_client.extract(
-        "microsoft/Florence-2-base",
+    return SIEClient(CLUSTER_URL, api_key=API_KEY).extract(
+        SIE_OCR_MODEL,
         Item(images=[{"data": image, "format": "png"}]),
-        options={"task": "<OCR_WITH_REGION>"}, gpu="l4-spot", wait_for_capacity=True, provision_timeout_s=900
+        options={"task": "<OCR_WITH_REGION>"}, gpu=GPU, wait_for_capacity=True, provision_timeout_s=PROVISION_TIMEOUT_S
     )
-
-    return result
-
 
 # Text Extraction <<<
 
@@ -188,8 +189,10 @@ def _field_score(query: str, target: str) -> float:
 	"""
     query_tokens = set(query.lower().split())
     target_tokens = set(target.lower().split())
-
-    coverage = len(query_tokens & target_tokens) / len(query_tokens) if query_tokens else 0.0
+    
+    # Jaccard: intersection / union — penalizes both missing and extra words
+    coverage = len(query_tokens & target_tokens) / len(query_tokens | target_tokens)
+    
     fuzzy = fuzz.token_sort_ratio(query.lower(), target.lower())
 
     # 60% coverage, 40% fuzzy — adjust if OCR quality is poor
@@ -239,6 +242,9 @@ def match_label(label_data: dict, top_n: int = TOP_N) -> list[dict]:
 
 def main():
 
+    if SIE_OCR_MODEL not in ALLOWED_OCR_MODELS:
+        raise ValueError(f"SIE_OCR_MODEL '{SIE_OCR_MODEL}' not in ALLOWED_OCR_MODELS: {ALLOWED_OCR_MODELS}")
+
     # Load image
     wine_label = Image.open("wine_test.png")
     wine_label.show()
@@ -260,10 +266,9 @@ def main():
     # Fuzzy match with known wines
     matched_labels: list[dict] = match_label(extracted_text)
     print(f"\nMatched Labels:")
-    [print(dictionary) for dictionary in matched_labels]
+    [print(dictionary) for dictionary in matched_labels] 
     
-    
-    # DEBUG >>>
+    ''' DEBUG >>>
 
     tries = 0
     
@@ -276,8 +281,7 @@ def main():
         
         tries += 1
     
-    # DEBUG <<<
-
+    DEBUG <<< '''
 
 if __name__ == "__main__":
     main()
