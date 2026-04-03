@@ -1,18 +1,19 @@
+import json
 import os
+import sqlite3
 from contextlib import asynccontextmanager
+from pathlib import Path
 from threading import Lock
 
-import datasource
-import engine
 import pandas as pd
-import pretty_print
-import transforms
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from wine_flavor import datasource, engine, pretty_print, transforms
+from wine_picture_detection import detect_wine_from_image_bytes
 
 load_dotenv()
 
@@ -66,6 +67,7 @@ REVIEW_PAGES = _require_int_env("REVIEW_PAGES", 1)
 COSINE_TOP_K = _require_int_env("COSINE_TOP_K", 5)
 RERANK_MAX_TERMS = _require_int_env("RERANK_MAX_TERMS", 12)
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
+DB_PATH = Path("wine_flavor.db")
 
 if RERANK_METHOD not in ALLOWED_RERANK_METHODS:
     raise ValueError(
@@ -211,6 +213,77 @@ def _catalog_wine_record(wine_row):
         "structure": _to_ui_structure_from_row(wine_row),
         "flavors": _extract_wine_flavors(wine_row),
     })
+
+
+def _load_detected_wine_from_db(wine_id):
+    if wine_id is None or not DB_PATH.exists():
+        return None
+
+    connection = sqlite3.connect(DB_PATH)
+    connection.row_factory = sqlite3.Row
+    try:
+        row = connection.execute(
+            """
+            SELECT
+                wine_id,
+                winery_name,
+                wine_name,
+                vintage_year,
+                country_name,
+                region_name,
+                style_name,
+                style_varietal_name,
+                price_amount,
+                wine_flavors_json,
+                taste_acidity,
+                taste_fizziness,
+                taste_intensity,
+                taste_sweetness,
+                taste_tannin
+            FROM wines
+            WHERE wine_id = ?
+            """,
+            (int(wine_id),),
+        ).fetchone()
+    finally:
+        connection.close()
+
+    if row is None:
+        return None
+
+    return _catalog_wine_record({
+        "wine_id": row["wine_id"],
+        "winery_name": row["winery_name"],
+        "wine_name": row["wine_name"],
+        "vintage_year": row["vintage_year"],
+        "country_name": row["country_name"],
+        "region_name": row["region_name"],
+        "style_name": row["style_name"],
+        "style_varietal_name": row["style_varietal_name"],
+        "price_amount": row["price_amount"],
+        "wine_flavors": json.loads(row["wine_flavors_json"] or "[]"),
+        "taste_acidity": row["taste_acidity"],
+        "taste_fizziness": row["taste_fizziness"],
+        "taste_intensity": row["taste_intensity"],
+        "taste_sweetness": row["taste_sweetness"],
+        "taste_tannin": row["taste_tannin"],
+    })
+
+
+def _select_detected_wine_record(wines, detected_wine_id=None):
+    if wines is not None and not wines.empty and detected_wine_id is not None:
+        matches = wines[wines["wine_id"] == detected_wine_id]
+        if not matches.empty:
+            return _catalog_wine_record(matches.iloc[0])
+
+    db_record = _load_detected_wine_from_db(detected_wine_id)
+    if db_record is not None:
+        return db_record
+
+    if wines is None or wines.empty:
+        raise HTTPException(status_code=503, detail="Wine catalog is not loaded.")
+
+    return _catalog_wine_record(wines.iloc[0])
 
 
 def _build_flavor_tags(wines):
@@ -362,6 +435,21 @@ def recommendations(payload: RecommendationRequest):
         "rerank_method": RERANK_METHOD,
         "candidate_count": len(candidate_row_indices),
         "results": [_to_recommendation_record(record) for record in result_records],
+    })
+
+
+@app.post("/detect-wine-image")
+async def detect_wine_image(file: UploadFile = File(...)):
+    catalog.load()
+
+    image_bytes = await file.read()
+    detection = detect_wine_from_image_bytes(image_bytes)
+    detected_wine = _select_detected_wine_record(catalog.wines, detection.wine_id)
+
+    return jsonable_encoder({
+        "detected_wine": detected_wine,
+        "confidence": detection.confidence,
+        "detection_method": detection.detection_method,
     })
 
 

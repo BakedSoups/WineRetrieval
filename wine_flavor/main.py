@@ -1,10 +1,6 @@
-
-import datasource
-import engine
 import os
-import pretty_print
-import transforms
 from dotenv import load_dotenv
+from . import datasource, engine, pretty_print, transforms
 
 load_dotenv()
 

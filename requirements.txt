@@ -25,6 +25,7 @@ pillow==11.3.0
 propcache==0.4.1
 pydantic==2.11.10
 pydantic_core==2.33.2
+python-multipart==0.0.20
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 PyYAML==6.0.3

@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { fetchCatalog, fetchRecommendations } from "@/lib/api"
+import { useEffect, useRef, useState } from "react"
+import { detectWineFromImage, fetchCatalog, fetchRecommendations } from "@/lib/api"
 import { type FlavorCategory, type RecommendedWine, type Wine, type WineStructure } from "@/lib/wine-data"
 import { WineResultCard } from "./wine-result-card"
 import { WineGlassVisual } from "./wine-glass-visual"
@@ -22,6 +22,7 @@ import {
   SlidersHorizontal,
   X,
   RotateCcw,
+  Camera,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -61,7 +62,10 @@ export function WineRecommender() {
   const [recommendedWines, setRecommendedWines] = useState<RecommendedWine[]>([])
   const [isCatalogLoading, setIsCatalogLoading] = useState(true)
   const [isRecommendationsLoading, setIsRecommendationsLoading] = useState(false)
+  const [isDetectingWine, setIsDetectingWine] = useState(false)
+  const [detectedWine, setDetectedWine] = useState<Wine | null>(null)
   const [errorMessage, setErrorMessage] = useState<string>("")
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -104,6 +108,7 @@ export function WineRecommender() {
 
   const handleSelectWineFromSearch = (wineId: string) => {
     setSelectedReferenceWine(wineId)
+    setDetectedWine(catalogWines.find((wine) => wine.id === wineId) ?? null)
     setWineSearchQuery("")
     setWineSearchFocused(false)
   }
@@ -208,6 +213,31 @@ export function WineRecommender() {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load recommendations.")
     } finally {
       setIsRecommendationsLoading(false)
+    }
+  }
+
+  const handlePickCameraImage = () => {
+    cameraInputRef.current?.click()
+  }
+
+  const handleCameraImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+
+    try {
+      setIsDetectingWine(true)
+      setErrorMessage("")
+
+      const response = await detectWineFromImage(file)
+      const detected = response.detected_wine
+
+      setDetectedWine(detected)
+      setSelectedReferenceWine(detected.id)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to detect wine from image.")
+    } finally {
+      setIsDetectingWine(false)
     }
   }
 
@@ -466,6 +496,37 @@ export function WineRecommender() {
                   </button>
                 )}
               </div>
+
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleCameraImageChange}
+              />
+
+              <button
+                onClick={handlePickCameraImage}
+                disabled={isCatalogLoading || isDetectingWine}
+                className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDetectingWine ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                ) : (
+                  <Camera className="h-4 w-4 text-primary" />
+                )}
+                <span>{isDetectingWine ? "Detecting bottle..." : "Take a photo of a wine bottle"}</span>
+              </button>
+
+              {detectedWine && (
+                <div className="mb-4 rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-sm">
+                  <p className="font-medium text-foreground">Detected wine</p>
+                  <p className="text-muted-foreground">
+                    {detectedWine.name} {detectedWine.vintage ? `· ${detectedWine.vintage}` : ""}
+                  </p>
+                </div>
+              )}
 
               {referenceWine ? (
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10">
