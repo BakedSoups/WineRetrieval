@@ -8,8 +8,19 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from sie_sdk import SIEClient, Item
+import re
+import json
+import sqlite3
+from rapidfuzz import fuzz
 
 load_dotenv(Path(__file__).parent.parent / "wine_flavor" / ".env")
+
+DATABASE_PATH = os.getenv("DATABASE_PATH", "wine_flavor.db")
+TOP_N = int(os.getenv("TOP_N", 5))
+SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 0))
+DB_FIELDS = ["wine_name", "winery_name", "region_name", "country_name"]
+
+# Image quality check >>>
 
 def _is_blurry(img: np.ndarray, threshold_pct: float = 10.0) -> bool:
     # Laplacian variance empirical range 0–1000
@@ -47,7 +58,10 @@ def check_quality(image: Image.Image) -> dict:
         "low_contrast":   _is_low_contrast(gray_image),
         "low_resolution": _is_low_resolution(gray_image),
     }
+ 
+# Image quality check <<<
 
+# Image Preprocessing >>>
 
 def _deskew(image: np.ndarray) -> np.ndarray:
     
@@ -78,7 +92,7 @@ def _deskew(image: np.ndarray) -> np.ndarray:
 
 def preprocess(image: Image.Image) -> Image.Image:
 
-    # convert to np array
+    # convert to numpy array
     image_array: np.ndarray = np.array(image)
     
     # Resize
@@ -91,7 +105,9 @@ def preprocess(image: Image.Image) -> Image.Image:
     image_array = cv2.normalize(image_array, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX) 
         
     # Gray
-    image_array = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
+    RGB = 3
+    if len(image_array.shape) == RGB:
+        image_array = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
     
     #Dialate
     image_array = cv2.dilate(src=image_array, kernel=np.ones((1, 1), np.uint8), iterations=1)
@@ -108,13 +124,15 @@ def preprocess(image: Image.Image) -> Image.Image:
     # Convert back to Image and return
     return Image.fromarray(image_array)
 
+# Image Preprocessing <<<
 
+# Text Extraction >>>
 
 def textract(image: Image.Image):
+	
+    sie_client = SIEClient(os.getenv("CLUSTER_URL"), api_key=os.getenv("API_KEY"))
 
-    client = SIEClient(os.getenv("CLUSTER_URL"), api_key=os.getenv("API_KEY"))
-
-    result = client.extract(
+    result = sie_client.extract(
         "microsoft/Florence-2-base",
         Item(images=[{"data": image, "format": "png"}]),
         options={"task": "<OCR_WITH_REGION>"}, gpu="l4-spot", wait_for_capacity=True, provision_timeout_s=900
@@ -123,34 +141,143 @@ def textract(image: Image.Image):
     return result
 
 
-# def match():
-    # """ fuzzy match extracted text with known whines to find same whine or most similar """
-    # - wine name
-    # - vintage year
-    # - winery name
+# Text Extraction <<<
+
+# Fuzzy Match >>>
+
+def extract_blob(label_data: dict) -> str:
+    """Join all entity texts into one string, stripping XML artifacts."""
+    raw = " ".join(e["text"] for e in label_data.get("entities", []) if e.get("text"))
+    return re.sub(r"</?\w+>", "", raw).strip()
 
 
-def debug():
+def extract_vintage(blob: str) -> str | None:
+    """Pull first 4-digit year in valid wine vintage range via regex."""
+    match = re.search(r"\b(1[89]\d{2}|20[0-2]\d)\b", blob)
+    return match.group(0) if match else None
+
+
+def fetch_wines(db_path: str, vintage: str | None) -> list[dict]:
+    """Pre-filter by vintage if available, otherwise fetch all."""
+    connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+
+    if vintage:
+        cursor.execute("""
+            SELECT wine_id, winery_name, wine_name, vintage_year,
+                   rating_average, rating_count, country_name, region_name
+            FROM wines WHERE vintage_year = ?
+        """, (vintage,))
+    else:
+        cursor.execute("""
+            SELECT wine_id, winery_name, wine_name, vintage_year,
+                   rating_average, ratings_count, country_name, region_name
+            FROM wines
+        """)
+
+    rows = [dict(row) for row in cursor.fetchall()]
+    connection.close()
+    return rows
+
+
+def _field_score(query: str, target: str) -> float:
+    """
+	Score query against target. Rewards full word matches over partial overlap.
+	Combines fuzzy ratio (handles OCR noise) with word coverage (penalizes missing words).
+	"""
+    query_tokens = set(query.lower().split())
+    target_tokens = set(target.lower().split())
+
+    coverage = len(query_tokens & target_tokens) / len(query_tokens) if query_tokens else 0.0
+    fuzzy = fuzz.token_sort_ratio(query.lower(), target.lower())
+
+    # 60% coverage, 40% fuzzy — adjust if OCR quality is poor
+    return (fuzzy * 0.4) + (coverage * 100 * 0.6)
+
+def score_wine(wine: dict, entities: list[str]) -> float:
+    """For each entity, take its best score across all DB fields, then average across entities.
+    Vintage scored separately as exact match bonus."""
+    entity_scores = [
+        max(_field_score(entity, str(wine.get(field) or "")) for field in DB_FIELDS)
+        for entity in entities
+    ]
+
+    if wine.get("vintage_year"):
+        entity_scores.append(100 if any(entity == str(wine["vintage_year"]) for entity in entities) else 0)
+
+    return sum(entity_scores) / len(entity_scores) if entity_scores else 0.0
+
+
+def match_label(label_data: dict, top_n: int = TOP_N) -> list[dict]:
+    """Match a raw label extraction dict against the wine database.
+
+    Returns a list of up to top_n wine dicts sorted by match_score descending,
+    each containing: wine_id, winery_name, wine_name, vintage_year,
+    rating_average, rating_count, country_name, region_name, match_score (0-100).
+    Returns an empty list if no text or wine fields could be extracted.
+    """
+    blob = extract_blob(label_data)
+
+    if not blob:
+        return []
+
+    vintage = extract_vintage(blob)
+    # Each entity is a separate matching unit against all DB fields
+    entities = [e["text"].strip().lower() for e in label_data.get("entities", []) if e.get("text")]
+
+    wines = fetch_wines(DATABASE_PATH, vintage)
+    scored = sorted(
+        [{**wine, "match_score": score_wine(wine, entities)} for wine in wines],
+        key=lambda wine: wine["match_score"],
+        reverse=True
+    )
+
+    return [wine for wine in scored if wine["match_score"] >= SCORE_THRESHOLD][:top_n]
+
+# Fuzzy Match <<<
+
+def main():
 
     # Load image
-    wine_label = Image.open("label1.png")
+    wine_label = Image.open("wine_test.png")
     wine_label.show()
-    print("Loaded image")
+    print("\nLoaded image")
 
     # Check image quality
     image_quality = check_quality(wine_label)
-    print(f"Image quality:\n\t{image_quality}")
-    return 
+    print(f"\nImage quality:\n{image_quality}")
 
     # Preprocess Image
-    preprocessed_label = preprocess(wine_label)
-    preprocessed_label.show()
-    print("Preprocessed image")
+    # preprocessed_label = preprocess(wine_label)
+    # preprocessed_label.show()
+    # print("Preprocessed image")
 
     # Extract text 
-    extracted_text = textract(preprocessed_label)
-    print(f"Extracted Text:\n\t{extracted_text}")
+    extracted_text = textract(wine_label)
+    print(f"\nExtracted Text:\n{extracted_text}\n")
+
+    # Fuzzy match with known wines
+    matched_labels: list[dict] = match_label(extracted_text)
+    print(f"\nMatched Labels:")
+    [print(dictionary) for dictionary in matched_labels]
+    
+    
+    # DEBUG >>>
+
+    tries = 0
+    
+    for dictionary in matched_labels:
+        
+        if dictionary["wine_name"] == "Quinta de São Sebastião":
+            print(dictionary)
+            print(f"{tries=}")
+            break
+        
+        tries += 1
+    
+    # DEBUG <<<
 
 
 if __name__ == "__main__":
-    debug()
+    main()
