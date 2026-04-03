@@ -1,4 +1,5 @@
 import type { RecommendedWine, WineStructure } from "@/lib/wine-data"
+import { WineGlassVisual } from "./wine-glass-visual"
 import { MapPin, Check, Minus } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -79,9 +80,9 @@ export function WineResultCard({ wine, rank, userStructure, userFlavors }: WineR
           </div>
         </div>
 
-        {/* Bottle Image Placeholder */}
-        <div className="mx-auto mb-4 mt-2 h-24 w-14 rounded-xl bg-gradient-to-b from-primary/15 via-primary/10 to-transparent flex items-center justify-center">
-          <div className="h-18 w-4 rounded-full bg-gradient-to-b from-primary/30 to-primary/10" />
+        {/* Wine Visual */}
+        <div className="mx-auto mb-4 mt-2 flex h-32 items-center justify-center">
+          <WineGlassVisual structure={wine.structure} className="h-28 w-24" />
         </div>
 
         {/* Wine Info */}
