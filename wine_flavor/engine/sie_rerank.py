@@ -18,50 +18,6 @@ def _resolve_sie_connection(base_url=None):
     return resolved_base_url, api_key
 
 
-def build_wine_rerank_text(wine_row):
-    from .vectors import pull_flavor_counts
-
-    text_parts = []
-
-    wine_name = wine_row.get("wine_name")
-    winery_name = wine_row.get("winery_name")
-    vintage_year = wine_row.get("vintage_year")
-    style_name = wine_row.get("style_name")
-    country_name = wine_row.get("country_name")
-    region_name = wine_row.get("region_name")
-
-    headline_parts = [part for part in [winery_name, wine_name, vintage_year] if part and part != "None"]
-    if headline_parts:
-        text_parts.append(" ".join(str(part) for part in headline_parts))
-    if style_name:
-        text_parts.append(f"Style: {style_name}")
-    if country_name or region_name:
-        location = ", ".join(str(part) for part in [region_name, country_name] if part and part != "None")
-        text_parts.append(f"Origin: {location}")
-
-    flavor_counts = pull_flavor_counts(wine_row)
-    if flavor_counts:
-        weighted_flavors = sorted(flavor_counts.items(), key=lambda item: item[1], reverse=True)
-        flavor_summary = ", ".join(f"{flavor_name} ({flavor_weight:g})" for flavor_name, flavor_weight in weighted_flavors)
-        text_parts.append(f"Tasting notes: {flavor_summary}")
-
-    structure_parts = []
-    for label, value in [
-        ("acidity", wine_row.get("taste_acidity")),
-        ("fizziness", wine_row.get("taste_fizziness")),
-        ("intensity", wine_row.get("taste_intensity")),
-        ("sweetness", wine_row.get("taste_sweetness")),
-        ("tannin", wine_row.get("taste_tannin")),
-    ]:
-        if value is not None:
-            structure_parts.append(f"{label}={value}")
-
-    if structure_parts:
-        text_parts.append(f"Structure: {', '.join(structure_parts)}")
-
-    return "\n".join(part for part in text_parts if part and part != "None")
-
-
 def pull_wine_reviews(wine_row):
     reviews = wine_row.get("wine_reviews") or wine_row.get("reviews") or []
     normalized_reviews = []
@@ -75,30 +31,6 @@ def pull_wine_reviews(wine_row):
                 normalized_reviews.append(str(review_text).strip())
 
     return normalized_reviews
-
-
-def build_user_query_text(user_preferences):
-    structure_preferences = user_preferences.get("structure", {})
-    flavor_preferences = user_preferences.get("flavors", {})
-
-    text_parts = ["Find wines matching this taste profile."]
-
-    structure_summary = (
-        "Structure preferences: "
-        f"acidity={structure_preferences.get('acidity', 0.5)}, "
-        f"fizziness={structure_preferences.get('fizziness', 0.5)}, "
-        f"intensity={structure_preferences.get('intensity', 0.5)}, "
-        f"sweetness={structure_preferences.get('sweetness', 0.5)}, "
-        f"tannin={structure_preferences.get('tannin', 0.5)}"
-    )
-    text_parts.append(structure_summary)
-
-    if flavor_preferences:
-        ordered_flavors = sorted(flavor_preferences.items(), key=lambda item: item[1], reverse=True)
-        flavor_summary = ", ".join(f"{flavor_name} ({flavor_weight})" for flavor_name, flavor_weight in ordered_flavors)
-        text_parts.append(f"Preferred flavors: {flavor_summary}")
-
-    return "\n".join(text_parts)
 
 
 def _structure_label(value):

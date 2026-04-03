@@ -1,10 +1,6 @@
 import numpy as np
 import pandas as pd
 
-
-STRUCTURE_NAMES = ["acidity", "fizziness", "intensity", "sweetness", "tannin"]
-
-
 def pull_structure(wine_row):
     def normalize_taste(value, default=2.5):
         if pd.isna(value):
