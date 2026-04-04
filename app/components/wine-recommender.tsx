@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { detectWineFromImage, fetchCatalog, fetchRecommendations } from "@/lib/api"
+import { analyzeFlavorPrompt, detectWineFromImage, fetchCatalog, fetchRecommendations } from "@/lib/api"
 import { type FlavorCategory, type RecommendedWine, type Wine, type WineStructure } from "@/lib/wine-data"
 import { WineResultCard } from "./wine-result-card"
 import { WineGlassVisual } from "./wine-glass-visual"
@@ -190,49 +190,22 @@ export function WineRecommender() {
     )
   }
 
-  const handleFlavorQuerySubmit = (e: React.FormEvent) => {
+  const handleFlavorQuerySubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!flavorQuery.trim()) return
 
-    setIsAnalyzing(true)
-    setTimeout(() => {
-      const adjustments: Partial<WineStructure> = {}
-      const query = flavorQuery.toLowerCase()
-
-      if (query.includes("bold") || query.includes("rich") || query.includes("full")) {
-        adjustments.intensity = Math.min(100, structure.intensity + 20)
-        adjustments.tannin = Math.min(100, structure.tannin + 15)
-      }
-      if (query.includes("light") || query.includes("crisp") || query.includes("fresh")) {
-        adjustments.acidity = Math.min(100, structure.acidity + 20)
-        adjustments.intensity = Math.max(0, structure.intensity - 15)
-      }
-      if (query.includes("sweet") || query.includes("fruit")) {
-        adjustments.sweetness = Math.min(100, structure.sweetness + 25)
-      }
-      if (query.includes("dry")) {
-        adjustments.sweetness = Math.max(0, structure.sweetness - 20)
-      }
-      if (query.includes("sparkling") || query.includes("bubbly") || query.includes("champagne")) {
-        adjustments.fizziness = Math.min(100, structure.fizziness + 60)
-        adjustments.acidity = Math.min(100, structure.acidity + 15)
-      }
-
-      setStructure((prev) => ({
-        ...prev,
-        ...adjustments,
-        acidity: Math.min(100, Math.max(0, (adjustments.acidity ?? prev.acidity) + (Math.random() * 10 - 5))),
-        intensity: Math.min(100, Math.max(0, (adjustments.intensity ?? prev.intensity) + (Math.random() * 10 - 5))),
-      }))
-
-      const allFlavors = getAllFlavors()
-      const numToSelect = Math.floor(Math.random() * 3) + 2
-      const shuffled = [...allFlavors].sort(() => Math.random() - 0.5)
-      setSelectedFlavors((prev) => [...new Set([...prev, ...shuffled.slice(0, numToSelect)])])
-
-      setIsAnalyzing(false)
+    try {
+      setIsAnalyzing(true)
+      setErrorMessage("")
+      const response = await analyzeFlavorPrompt(flavorQuery.trim())
+      setStructure(response.structure)
+      setSelectedFlavors((prev) => [...new Set([...prev, ...response.flavors])])
       setFlavorQuery("")
-    }, 1000)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to analyze flavor prompt.")
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   const handleFindWines = async () => {
@@ -516,8 +489,49 @@ export function WineRecommender() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-[1fr,340px] gap-8">
-          <div className="space-y-6">
+        <div className="grid lg:grid-cols-[340px,minmax(0,1fr)] gap-8 items-start">
+          <div className="lg:sticky lg:top-8 lg:self-start space-y-6">
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <h3 className="text-sm font-medium text-foreground text-center mb-2">
+                Your Wine
+              </h3>
+
+              <WineGlassVisual structure={structure} className="h-[260px]" />
+
+              <div className="mt-4 pt-4 border-t border-border space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Body</span>
+                  <span className="text-foreground">
+                    {structure.intensity > 70 ? "Full" : structure.intensity > 40 ? "Medium" : "Light"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Style</span>
+                  <span className="text-foreground">
+                    {structure.fizziness > 50 ? "Sparkling" : structure.sweetness > 30 ? "Off-dry" : "Dry"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Character</span>
+                  <span className="text-foreground">
+                    {structure.tannin > 60 ? "Structured" : structure.acidity > 60 ? "Fresh" : "Smooth"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              onClick={handleFindWines}
+              disabled={!hasProfile || isRecommendationsLoading || isCatalogLoading}
+              className="w-full h-12"
+              size="lg"
+            >
+              <Search className="mr-2 h-4 w-4" />
+              {isRecommendationsLoading ? "Finding wines..." : "Find Wines"}
+            </Button>
+          </div>
+
+          <div className="space-y-6 min-w-0">
             <div className="rounded-2xl border border-border bg-card p-5">
               <form onSubmit={handleFlavorQuerySubmit} className="flex gap-3">
                 <div className="relative flex-1">
@@ -756,7 +770,7 @@ export function WineRecommender() {
             <div className="rounded-2xl border border-border bg-card p-5">
               <h3 className="text-sm font-medium text-foreground mb-4">Flavors</h3>
 
-              <div className="space-y-4">
+              <div className="max-h-[540px] overflow-y-auto pr-1 space-y-4">
                 {flavorTags.map((category) => (
                   <div key={category.category}>
                     <p className="text-xs text-muted-foreground mb-2">{category.category}</p>
@@ -812,46 +826,6 @@ export function WineRecommender() {
             </div>
           </div>
 
-          <div className="lg:sticky lg:top-8 lg:self-start space-y-6">
-            <div className="rounded-2xl border border-border bg-card p-6">
-              <h3 className="text-sm font-medium text-foreground text-center mb-2">
-                Your Wine
-              </h3>
-
-              <WineGlassVisual structure={structure} className="h-[260px]" />
-
-              <div className="mt-4 pt-4 border-t border-border space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Body</span>
-                  <span className="text-foreground">
-                    {structure.intensity > 70 ? "Full" : structure.intensity > 40 ? "Medium" : "Light"}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Style</span>
-                  <span className="text-foreground">
-                    {structure.fizziness > 50 ? "Sparkling" : structure.sweetness > 30 ? "Off-dry" : "Dry"}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Character</span>
-                  <span className="text-foreground">
-                    {structure.tannin > 60 ? "Structured" : structure.acidity > 60 ? "Fresh" : "Smooth"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              onClick={handleFindWines}
-              disabled={!hasProfile || isRecommendationsLoading || isCatalogLoading}
-              className="w-full h-12"
-              size="lg"
-            >
-              <Search className="mr-2 h-4 w-4" />
-              {isRecommendationsLoading ? "Finding wines..." : "Find Wines"}
-            </Button>
-          </div>
         </div>
       </main>
     </div>

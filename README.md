@@ -13,6 +13,16 @@ App URLs:
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:8000`
 
+---
+
+## Environment files
+
+- Root `app.py` uses the root `.env`
+- `wine_picture_detection` also has its own local `.env` / `.env.example` for working in that folder directly
+- This split is intentional so people can work either from the full app root or from a feature subfolder in isolation
+
+If you are running the main app, put the required backend keys in the root `.env`.
+
 ## Why the backend runs on the host
 
 The OCR image-detection flow calls an external SIE OCR endpoint defined by `CLUSTER_URL`.
