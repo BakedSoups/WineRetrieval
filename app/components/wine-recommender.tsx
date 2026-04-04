@@ -45,6 +45,45 @@ const structureLabels = {
   tannin: { label: "Tannin", low: "Smooth", high: "Grippy" },
 }
 
+function getDetectionMessage(detectionMethod: string) {
+  if (detectionMethod === "sie-florence-no-match") {
+    return "No wine match found for that image. Try a clearer label photo or pick the wine manually."
+  }
+
+  if (detectionMethod === "invalid-image") {
+    return "That file could not be read as an image. Try a JPG, PNG, or WebP photo."
+  }
+
+  if (detectionMethod.startsWith("ocr-error-sieconnectionerror")) {
+    return "The OCR service is unavailable right now. Try again later or pick the wine manually."
+  }
+
+  if (detectionMethod.startsWith("ocr-error-")) {
+    return "OCR could not process that image. Try a clearer label photo or pick the wine manually."
+  }
+
+  return "No wine match found for that image. Try a clearer label photo or pick the wine manually."
+}
+
+function formatDetectionMethod(detectionMethod: string) {
+  switch (detectionMethod) {
+    case "sie-florence-fuzzy-match":
+      return "OCR matched label text"
+    case "sie-florence-no-match":
+      return "OCR found text but no catalog match"
+    case "invalid-image":
+      return "Unsupported image"
+    default:
+      if (detectionMethod.startsWith("ocr-error-sieconnectionerror")) {
+        return "OCR service unavailable"
+      }
+      if (detectionMethod.startsWith("ocr-error-")) {
+        return "OCR failed"
+      }
+      return detectionMethod
+    }
+}
+
 export function WineRecommender() {
   const [view, setView] = useState<View>("profile")
   const [structure, setStructure] = useState<WineStructure>(defaultStructure)
@@ -252,7 +291,7 @@ export function WineRecommender() {
       setDetectionMethod(response.detection_method)
 
       if (!detected) {
-        setErrorMessage("No wine match found for that image. Try a clearer label photo or pick the wine manually.")
+        setErrorMessage(getDetectionMessage(response.detection_method))
         return
       }
 
@@ -424,7 +463,7 @@ export function WineRecommender() {
           </p>
 
           {filteredResults.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               {filteredResults.map((wine, index) => (
                 <WineResultCard
                   key={wine.id}
@@ -584,7 +623,7 @@ export function WineRecommender() {
                   {detectionConfidence !== null && (
                     <p className="mt-1 text-xs text-muted-foreground">
                       Confidence: {Math.round(detectionConfidence * 100)}%
-                      {detectionMethod ? ` · ${detectionMethod}` : ""}
+                      {detectionMethod ? ` · ${formatDetectionMethod(detectionMethod)}` : ""}
                     </p>
                   )}
                 </div>

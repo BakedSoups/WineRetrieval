@@ -32,6 +32,12 @@ export function WineResultCard({ wine, rank, userStructure, userFlavors }: WineR
     wine.flavors.some(f => f.toLowerCase() === flavor.toLowerCase())
   )
 
+  const profileTags = [
+    wine.structure.tannin >= 60 ? "Tannic" : wine.structure.tannin <= 30 ? "Smooth" : null,
+    wine.structure.sweetness >= 35 ? "Sweet" : wine.structure.sweetness <= 15 ? "Dry" : null,
+    wine.style || null,
+  ].filter(Boolean) as string[]
+
   return (
     <div className={cn(
       "group relative rounded-2xl border border-border bg-card overflow-hidden transition-all duration-300",
@@ -39,7 +45,7 @@ export function WineResultCard({ wine, rank, userStructure, userFlavors }: WineR
       rank === 1 && "ring-2 ring-secondary/50"
     )}>
       {/* Top Section with Match */}
-      <div className="relative p-5 pb-4">
+      <div className="relative p-6 pb-4">
         {/* Rank Badge */}
         <div className={cn(
           "absolute -top-0 -left-0 h-8 w-8 rounded-br-xl flex items-center justify-center text-sm font-bold",
@@ -49,7 +55,7 @@ export function WineResultCard({ wine, rank, userStructure, userFlavors }: WineR
         </div>
 
         {/* Match Percentage Circle */}
-        <div className="absolute top-3 right-3">
+        <div className="absolute right-4 top-4">
           <div className="relative h-12 w-12">
             <svg className="h-12 w-12 -rotate-90">
               <circle
@@ -81,21 +87,38 @@ export function WineResultCard({ wine, rank, userStructure, userFlavors }: WineR
         </div>
 
         {/* Wine Visual */}
-        <div className="mx-auto mb-4 mt-2 flex h-32 items-center justify-center">
+        <div className="mx-auto mb-5 mt-2 flex h-32 items-center justify-center">
           <WineGlassVisual structure={wine.structure} className="h-28 w-24" />
         </div>
 
         {/* Wine Info */}
-        <div className="text-center space-y-1.5">
-          <h4 className="font-serif text-base font-semibold text-foreground leading-tight group-hover:text-primary transition-colors">
-            {wine.name}
-          </h4>
-          <p className="text-xs text-muted-foreground">{wine.vintage} · {wine.winery}</p>
-          
-          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-            <MapPin className="h-3 w-3" />
-            <span>{wine.region}, {wine.country}</span>
+        <div className="grid gap-3 pr-14 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:pr-0">
+          <div className="min-w-0 space-y-1.5 text-left">
+            <h4 className="font-serif text-base font-semibold leading-tight text-foreground transition-colors group-hover:text-primary">
+              {wine.name}
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              {wine.vintage} · {wine.winery}
+            </p>
+
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3 shrink-0" />
+              <span className="truncate">{wine.region}, {wine.country}</span>
+            </div>
           </div>
+
+          {profileTags.length > 0 && (
+            <div className="flex max-w-[12rem] flex-wrap gap-1.5 sm:justify-end">
+              {profileTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Lock
+from uuid import uuid4
 
 import pandas as pd
 import uvicorn
@@ -106,21 +107,70 @@ class DemoCatalog:
         self.flavor_idf = None
         self.wine_matrix = None
 
+    def _load_from_sqlite(self):
+        if not DB_PATH.exists():
+            raise FileNotFoundError(f"Catalog database not found at {DB_PATH}")
+
+        connection = sqlite3.connect(DB_PATH)
+        try:
+            wines = pd.read_sql_query(
+                """
+                SELECT
+                    wine_id,
+                    winery_name,
+                    wine_name,
+                    vintage_year,
+                    rating_average,
+                    ratings_count,
+                    country_name,
+                    region_name,
+                    taste_acidity,
+                    taste_fizziness,
+                    taste_intensity,
+                    taste_sweetness,
+                    taste_tannin,
+                    wine_flavors_json,
+                    style_name,
+                    style_varietal_name,
+                    price_amount,
+                    price_currency
+                FROM wines
+                ORDER BY wine_id
+                LIMIT ?
+                """,
+                connection,
+                params=(DEMO_MAX_WINES if DEMO_MAX_WINES > 0 else -1,),
+            )
+        finally:
+            connection.close()
+
+        if wines.empty:
+            raise RuntimeError("Local SQLite catalog is empty.")
+
+        wines["wine_flavors"] = wines["wine_flavors_json"].apply(lambda value: json.loads(value or "[]"))
+        wines = wines.drop(columns=["wine_flavors_json"])
+        wines["review_count"] = 0
+        return wines
+
     def load(self, force=False):
         with self._lock:
             if self._loaded and not force:
                 return
 
-            wines = datasource.fetch_vivino_wines(num_pages=DEMO_NUM_PAGES)
-            if DEMO_MAX_WINES > 0:
-                wines = wines.head(DEMO_MAX_WINES).copy()
+            if DB_PATH.exists():
+                wines = self._load_from_sqlite()
+            else:
+                wines = datasource.fetch_vivino_wines(num_pages=DEMO_NUM_PAGES)
+                if DEMO_MAX_WINES > 0:
+                    wines = wines.head(DEMO_MAX_WINES).copy()
 
-            wines = datasource.attach_vivino_reviews(
-                wines,
-                review_pages=REVIEW_PAGES,
-                reviews_per_page=REVIEWS_PER_WINE,
-                language="en",
-            )
+                wines = datasource.attach_vivino_reviews(
+                    wines,
+                    review_pages=REVIEW_PAGES,
+                    reviews_per_page=REVIEWS_PER_WINE,
+                    language="en",
+                )
+
             unique_flavors = transforms.unique_flavors(wines)
             flavor_idf = engine.build_flavor_idf(wines)
             wine_matrix = engine.build_wine_matrix(wines, unique_flavors, flavor_idf)
@@ -200,9 +250,12 @@ def _wine_style(wine_row):
 
 def _catalog_wine_record(wine_row):
     wine_id = wine_row.get("wine_id")
+    row_index = wine_row.get("row_index")
+    if row_index is None:
+        row_index = getattr(wine_row, "name", -1)
     return _normalize_record({
         "id": str(int(wine_id)) if wine_id is not None and not pd.isna(wine_id) else "",
-        "row_index": int(wine_row.name),
+        "row_index": int(row_index),
         "name": wine_row.get("wine_name"),
         "winery": wine_row.get("winery_name"),
         "vintage": wine_row.get("vintage_year"),
@@ -332,7 +385,11 @@ def _to_recommendation_record(record):
 
 @asynccontextmanager
 async def lifespan(_app):
-    catalog.load()
+    try:
+        catalog.load()
+    except Exception:
+        # Keep the API bootable even if remote catalog fetches fail during startup.
+        pass
     yield
 
 
@@ -443,6 +500,28 @@ async def detect_wine_image(file: UploadFile = File(...)):
     catalog.load()
 
     image_bytes = await file.read()
+    uploads_dir = Path("uploads")
+    original_name = file.filename or "upload.bin"
+    suffix = Path(original_name).suffix or ".bin"
+    saved_path = uploads_dir / f"{uuid4().hex}{suffix}"
+
+    try:
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        saved_path.write_bytes(image_bytes)
+        saved_path_value = str(saved_path)
+    except OSError as exc:
+        saved_path_value = f"save-failed:{exc.__class__.__name__}"
+
+    print(
+        "detect-wine-image upload:",
+        {
+            "filename": original_name,
+            "content_type": file.content_type,
+            "bytes": len(image_bytes),
+            "saved_path": saved_path_value,
+        },
+    )
+
     detection = detect_wine_from_image_bytes(image_bytes)
     detected_wine = _select_detected_wine_record(catalog.wines, detection.wine_id)
 
@@ -450,6 +529,7 @@ async def detect_wine_image(file: UploadFile = File(...)):
         "detected_wine": detected_wine,
         "confidence": detection.confidence,
         "detection_method": detection.detection_method,
+        "ocr_text": detection.ocr_text,
     })
 
 

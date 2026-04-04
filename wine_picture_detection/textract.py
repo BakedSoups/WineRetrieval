@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import math
 import os
 import re
@@ -11,12 +12,21 @@ import numpy as np
 from dotenv import load_dotenv
 from PIL import Image
 
-load_dotenv()
-
 ROOT_DIR = Path(__file__).resolve().parent.parent
-DATABASE_PATH = Path(os.getenv("DATABASE_PATH", ROOT_DIR / "wine_flavor.db"))
+PACKAGE_DIR = Path(__file__).resolve().parent
+
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv(PACKAGE_DIR / ".env", override=True)
+
+_database_path_value = os.getenv("DATABASE_PATH", "wine_flavor.db")
+DATABASE_PATH = Path(_database_path_value)
+if not DATABASE_PATH.is_absolute():
+    DATABASE_PATH = ROOT_DIR / DATABASE_PATH
+
 TOP_N = int(os.getenv("TOP_N", 5))
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 0))
+OCR_WAIT_FOR_CAPACITY = os.getenv("OCR_WAIT_FOR_CAPACITY", "false").lower() == "true"
+OCR_PROVISION_TIMEOUT_S = int(os.getenv("OCR_PROVISION_TIMEOUT_S", 30))
 DB_FIELDS = ("wine_name", "winery_name", "region_name", "country_name")
 
 
@@ -69,10 +79,23 @@ def _deskew(image: np.ndarray) -> np.ndarray:
     )
 
 
+def normalize_image(image: Image.Image) -> Image.Image:
+    if image.mode == "RGB":
+        return image
+
+    if image.mode in {"RGBA", "LA"}:
+        background = Image.new("RGB", image.size, (255, 255, 255))
+        alpha = image.getchannel("A")
+        background.paste(image.convert("RGBA"), mask=alpha)
+        return background
+
+    return image.convert("RGB")
+
+
 def preprocess(image: Image.Image) -> Image.Image:
     cv2 = _require_cv2()
 
-    image_array = np.array(image)
+    image_array = np.array(normalize_image(image))
     image_array = cv2.resize(image_array, None, fx=1.2, fy=1.2, interpolation=cv2.INTER_CUBIC)
     image_array = _deskew(image_array)
     image_array = cv2.normalize(image_array, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
@@ -101,8 +124,8 @@ def textract(image: Image.Image) -> dict[str, Any]:
         Item(images=[{"data": image, "format": "png"}]),
         options={"task": "<OCR_WITH_REGION>"},
         gpu="l4-spot",
-        wait_for_capacity=True,
-        provision_timeout_s=900,
+        wait_for_capacity=OCR_WAIT_FOR_CAPACITY,
+        provision_timeout_s=OCR_PROVISION_TIMEOUT_S,
     )
 
 
@@ -182,3 +205,48 @@ def match_label(label_data: dict[str, Any], top_n: int = TOP_N) -> list[dict[str
         reverse=True,
     )
     return [wine for wine in scored if wine["match_score"] >= SCORE_THRESHOLD][:top_n]
+
+
+def extract_and_match_image(image: Image.Image, top_n: int = TOP_N) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    normalized = normalize_image(image)
+    extracted = textract(preprocess(normalized))
+    matches = match_label(extracted, top_n=top_n)
+    return extracted, matches
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Run OCR against a wine label image.")
+    parser.add_argument(
+        "image",
+        nargs="?",
+        default=str(PACKAGE_DIR / "wine_test.webp"),
+        help="Path to the image to OCR. Defaults to wine_picture_detection/wine_test.webp",
+    )
+    parser.add_argument(
+        "--top-n",
+        type=int,
+        default=TOP_N,
+        help="Number of fuzzy-match results to print.",
+    )
+    args = parser.parse_args()
+
+    image_path = Path(args.image)
+    print(f"Image: {image_path}")
+    if not image_path.exists():
+        raise FileNotFoundError(f"Image not found: {image_path}")
+
+    image = Image.open(image_path)
+    image.load()
+    print(f"Loaded: format={image.format} mode={image.mode} size={image.size}")
+
+    extracted, matches = extract_and_match_image(image, top_n=args.top_n)
+    print("\nOCR output:")
+    print(extracted)
+
+    print(f"\nTop {args.top_n} matches:")
+    for match in matches:
+        print(match)
+
+
+if __name__ == "__main__":
+    main()
