@@ -137,7 +137,8 @@ export function WineRecommender() {
     }
   }, [])
 
-  const referenceWine = catalogWines.find((wine) => wine.id === selectedReferenceWine)
+  const catalogReferenceWine = catalogWines.find((wine) => wine.id === selectedReferenceWine)
+  const referenceWine = catalogReferenceWine ?? (detectedWine?.id === selectedReferenceWine ? detectedWine : undefined)
 
   const filteredWineResults = wineSearchQuery.trim()
     ? catalogWines
