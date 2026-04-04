@@ -34,4 +34,4 @@ Because of that, the reliable cross-platform setup is:
 - backend on the host Python environment
 - frontend in Docker
 
-The frontend container talks to the host backend through `host.docker.internal`, which works on macOS and Windows and is mapped in `compose.yml` for Linux via `host-gateway`.
+The browser talks to the backend at `http://localhost:8000`. The frontend container only hosts the Next.js dev server on `http://localhost:3000`.

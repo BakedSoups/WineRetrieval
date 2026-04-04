@@ -376,6 +376,7 @@ def _prompt_flavor_adjustment(prompt: str, available_flavors: list[str]) -> dict
     client = OpenAI(api_key=api_key)
     response = client.responses.create(
         model="gpt-4.1-mini",
+        text={"format": {"type": "json_object"}},
         input=[
             {
                 "role": "system",
@@ -391,7 +392,15 @@ def _prompt_flavor_adjustment(prompt: str, available_flavors: list[str]) -> dict
             },
         ],
     )
-    return json.loads(response.output_text)
+
+    output_text = (response.output_text or "").strip()
+    if not output_text:
+        raise ValueError("OpenAI returned an empty response")
+
+    try:
+        return json.loads(output_text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"OpenAI returned invalid JSON: {output_text}") from exc
 
 
 def _to_recommendation_record(record):
