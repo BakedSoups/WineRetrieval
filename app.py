@@ -33,7 +33,9 @@ def _require_float_env(name, fallback_name=None):
         value = os.getenv(fallback_name)
     if value is None or value == "":
         if fallback_name:
-            raise ValueError(f"Missing required environment variable: {name} (or legacy {fallback_name})")
+            raise ValueError(
+                f"Missing required environment variable: {name} (or legacy {fallback_name})"
+            )
         raise ValueError(f"Missing required environment variable: {name}")
     return float(value)
 
@@ -53,7 +55,9 @@ try:
     SIE_EMBEDDING_MODEL = _require_env("SIE_EMBEDDING_MODEL")
     RERANK_ALPHA = _require_float_env("RERANK_ALPHA")
     CUSTOM_RERANK_A = _require_float_env("CUSTOM_RERANK_A")
-    CUSTOM_RERANK_NO_REVIEW_PENALTY = float(_require_env("CUSTOM_RERANK_NO_REVIEW_PENALTY"))
+    CUSTOM_RERANK_NO_REVIEW_PENALTY = float(
+        _require_env("CUSTOM_RERANK_NO_REVIEW_PENALTY")
+    )
 except ValueError as exc:
     raise ValueError(f"{exc}. Add it to your .env file.") from exc
 
@@ -63,10 +67,10 @@ ALLOWED_SIE_RERANK_MODELS = {
 }
 ALLOWED_RERANK_METHODS = {"standard", "custom"}
 DEMO_NUM_PAGES = _require_int_env("DEMO_NUM_PAGES", 5)
-DEMO_MAX_WINES = _require_int_env("DEMO_MAX_WINES", 100)
+DEMO_MAX_WINES = _require_int_env("DEMO_MAX_WINES", 200)
 REVIEWS_PER_WINE = _require_int_env("REVIEWS_PER_WINE", 5)
 REVIEW_PAGES = _require_int_env("REVIEW_PAGES", 1)
-COSINE_TOP_K = _require_int_env("COSINE_TOP_K", 50)
+COSINE_TOP_K = _require_int_env("COSINE_TOP_K", 20)
 RERANK_MAX_TERMS = _require_int_env("RERANK_MAX_TERMS", 12)
 SIE_GPU = os.getenv("SIE_GPU", "l4-spot")
 SIE_PROVISION_TIMEOUT_S = _require_int_env("SIE_PROVISION_TIMEOUT_S", 900)
@@ -154,7 +158,9 @@ class DemoCatalog:
         if wines.empty:
             raise RuntimeError("Local SQLite catalog is empty.")
 
-        wines["wine_flavors"] = wines["wine_flavors_json"].apply(lambda value: json.loads(value or "[]"))
+        wines["wine_flavors"] = wines["wine_flavors_json"].apply(
+            lambda value: json.loads(value or "[]")
+        )
         wines = wines.drop(columns=["wine_flavors_json"])
         wines["review_count"] = 0
         return wines
@@ -247,7 +253,9 @@ def _extract_wine_flavors(wine_row, max_flavors=6):
             if name:
                 flavor_counts[name] = flavor_counts.get(name, 0) + count
 
-    ordered_flavors = sorted(flavor_counts.items(), key=lambda item: item[1], reverse=True)
+    ordered_flavors = sorted(
+        flavor_counts.items(), key=lambda item: item[1], reverse=True
+    )
     return [name for name, _ in ordered_flavors[:max_flavors]]
 
 
@@ -260,19 +268,25 @@ def _catalog_wine_record(wine_row):
     row_index = wine_row.get("row_index")
     if row_index is None:
         row_index = getattr(wine_row, "name", -1)
-    return _normalize_record({
-        "id": str(int(wine_id)) if wine_id is not None and not pd.isna(wine_id) else "",
-        "row_index": int(row_index),
-        "name": wine_row.get("wine_name"),
-        "winery": wine_row.get("winery_name"),
-        "vintage": wine_row.get("vintage_year"),
-        "country": wine_row.get("country_name"),
-        "region": wine_row.get("region_name"),
-        "style": _wine_style(wine_row),
-        "price": wine_row.get("price_amount"),
-        "structure": _to_ui_structure_from_row(wine_row),
-        "flavors": _extract_wine_flavors(wine_row),
-    })
+    return _normalize_record(
+        {
+            "id": (
+                str(int(wine_id))
+                if wine_id is not None and not pd.isna(wine_id)
+                else ""
+            ),
+            "row_index": int(row_index),
+            "name": wine_row.get("wine_name"),
+            "winery": wine_row.get("winery_name"),
+            "vintage": wine_row.get("vintage_year"),
+            "country": wine_row.get("country_name"),
+            "region": wine_row.get("region_name"),
+            "style": _wine_style(wine_row),
+            "price": wine_row.get("price_amount"),
+            "structure": _to_ui_structure_from_row(wine_row),
+            "flavors": _extract_wine_flavors(wine_row),
+        }
+    )
 
 
 def _load_detected_wine_from_db(wine_id):
@@ -311,23 +325,25 @@ def _load_detected_wine_from_db(wine_id):
     if row is None:
         return None
 
-    return _catalog_wine_record({
-        "wine_id": row["wine_id"],
-        "winery_name": row["winery_name"],
-        "wine_name": row["wine_name"],
-        "vintage_year": row["vintage_year"],
-        "country_name": row["country_name"],
-        "region_name": row["region_name"],
-        "style_name": row["style_name"],
-        "style_varietal_name": row["style_varietal_name"],
-        "price_amount": row["price_amount"],
-        "wine_flavors": json.loads(row["wine_flavors_json"] or "[]"),
-        "taste_acidity": row["taste_acidity"],
-        "taste_fizziness": row["taste_fizziness"],
-        "taste_intensity": row["taste_intensity"],
-        "taste_sweetness": row["taste_sweetness"],
-        "taste_tannin": row["taste_tannin"],
-    })
+    return _catalog_wine_record(
+        {
+            "wine_id": row["wine_id"],
+            "winery_name": row["winery_name"],
+            "wine_name": row["wine_name"],
+            "vintage_year": row["vintage_year"],
+            "country_name": row["country_name"],
+            "region_name": row["region_name"],
+            "style_name": row["style_name"],
+            "style_varietal_name": row["style_varietal_name"],
+            "price_amount": row["price_amount"],
+            "wine_flavors": json.loads(row["wine_flavors_json"] or "[]"),
+            "taste_acidity": row["taste_acidity"],
+            "taste_fizziness": row["taste_fizziness"],
+            "taste_intensity": row["taste_intensity"],
+            "taste_sweetness": row["taste_sweetness"],
+            "taste_tannin": row["taste_tannin"],
+        }
+    )
 
 
 def _select_detected_wine_record(wines, detected_wine_id=None):
@@ -469,10 +485,15 @@ def health():
 @app.get("/catalog")
 def catalog_view():
     catalog.load()
-    return jsonable_encoder({
-        "wines": [_catalog_wine_record(wine_row) for _, wine_row in catalog.wines.iterrows()],
-        "flavorTags": _build_flavor_tags(catalog.wines),
-    })
+    return jsonable_encoder(
+        {
+            "wines": [
+                _catalog_wine_record(wine_row)
+                for _, wine_row in catalog.wines.iterrows()
+            ],
+            "flavorTags": _build_flavor_tags(catalog.wines),
+        }
+    )
 
 
 @app.post("/recommendations")
@@ -534,11 +555,13 @@ def recommendations(payload: RecommendationRequest):
         }
         result_records.append(_normalize_record(enriched_record))
 
-    return jsonable_encoder({
-        "rerank_method": RERANK_METHOD,
-        "candidate_count": len(candidate_row_indices),
-        "results": [_to_recommendation_record(record) for record in result_records],
-    })
+    return jsonable_encoder(
+        {
+            "rerank_method": RERANK_METHOD,
+            "candidate_count": len(candidate_row_indices),
+            "results": [_to_recommendation_record(record) for record in result_records],
+        }
+    )
 
 
 @app.post("/analyze-flavor-prompt")
@@ -552,20 +575,28 @@ def analyze_flavor_prompt(payload: FlavorPromptRequest):
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Prompt analysis failed: {exc}") from exc
+        raise HTTPException(
+            status_code=502, detail=f"Prompt analysis failed: {exc}"
+        ) from exc
 
     structure = result.get("structure") or {}
-    flavors = [flavor for flavor in (result.get("flavors") or []) if flavor in available_flavors_set]
-    return jsonable_encoder({
-        "structure": {
-            "acidity": max(0, min(100, int(structure.get("acidity", 50)))),
-            "fizziness": max(0, min(100, int(structure.get("fizziness", 0)))),
-            "intensity": max(0, min(100, int(structure.get("intensity", 50)))),
-            "sweetness": max(0, min(100, int(structure.get("sweetness", 10)))),
-            "tannin": max(0, min(100, int(structure.get("tannin", 50)))),
-        },
-        "flavors": flavors[:8],
-    })
+    flavors = [
+        flavor
+        for flavor in (result.get("flavors") or [])
+        if flavor in available_flavors_set
+    ]
+    return jsonable_encoder(
+        {
+            "structure": {
+                "acidity": max(0, min(100, int(structure.get("acidity", 50)))),
+                "fizziness": max(0, min(100, int(structure.get("fizziness", 0)))),
+                "intensity": max(0, min(100, int(structure.get("intensity", 50)))),
+                "sweetness": max(0, min(100, int(structure.get("sweetness", 10)))),
+                "tannin": max(0, min(100, int(structure.get("tannin", 50)))),
+            },
+            "flavors": flavors[:8],
+        }
+    )
 
 
 @app.post("/detect-wine-image")
@@ -598,11 +629,13 @@ async def detect_wine_image(file: UploadFile = File(...)):
     detection = detect_wine_from_image_bytes(image_bytes)
     detected_wine = _select_detected_wine_record(catalog.wines, detection.wine_id)
 
-    return jsonable_encoder({
-        "detected_wine": detected_wine,
-        "confidence": detection.confidence,
-        "ocr_text": detection.ocr_text,
-    })
+    return jsonable_encoder(
+        {
+            "detected_wine": detected_wine,
+            "confidence": detection.confidence,
+            "ocr_text": detection.ocr_text,
+        }
+    )
 
 
 @app.post("/reload")
