@@ -206,6 +206,7 @@ def rerank_wines_with_custom_embeddings(
     base_url=None,
     model_name=None,
     gpu=None,
+    provision_timeout_s=900,
     a=None,
     alpha=None,
     no_review_penalty=0.5,
@@ -224,13 +225,14 @@ def rerank_wines_with_custom_embeddings(
         [{"id": "sample", "text": "sample"}],
         gpu=gpu,
         wait_for_capacity=True,
-        provision_timeout_s=900,
+        provision_timeout_s=provision_timeout_s,
     )[0]["dense"]
     embedding_generator = EmbeddingGenerator(
         client,
         len(sample_embedding),
         model_name,
         gpu=gpu,
+        provision_timeout_s=provision_timeout_s,
         a=a,
     )
 

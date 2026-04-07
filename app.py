@@ -68,6 +68,8 @@ REVIEWS_PER_WINE = _require_int_env("REVIEWS_PER_WINE", 5)
 REVIEW_PAGES = _require_int_env("REVIEW_PAGES", 1)
 COSINE_TOP_K = _require_int_env("COSINE_TOP_K", 5)
 RERANK_MAX_TERMS = _require_int_env("RERANK_MAX_TERMS", 12)
+SIE_GPU = os.getenv("SIE_GPU", "l4-spot")
+SIE_PROVISION_TIMEOUT_S = _require_int_env("SIE_PROVISION_TIMEOUT_S", 900)
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 DB_PATH = Path("wine_flavor.db")
 
@@ -498,6 +500,8 @@ def recommendations(payload: RecommendationRequest):
             reference_row_indices=payload.reference_row_indices,
             base_url=SIE_BASE_URL,
             model_name=SIE_EMBEDDING_MODEL,
+            gpu=SIE_GPU,
+            provision_timeout_s=SIE_PROVISION_TIMEOUT_S,
             a=CUSTOM_RERANK_A,
             alpha=RERANK_ALPHA,
             no_review_penalty=CUSTOM_RERANK_NO_REVIEW_PENALTY,
@@ -514,6 +518,8 @@ def recommendations(payload: RecommendationRequest):
             max_terms=RERANK_MAX_TERMS,
             base_url=SIE_BASE_URL,
             model_name=SIE_RERANK_MODEL,
+            gpu=SIE_GPU,
+            provision_timeout_s=SIE_PROVISION_TIMEOUT_S,
         )
 
     result_frame = pretty_print.build_results_frame(catalog.wines, reranked_matches)

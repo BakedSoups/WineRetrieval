@@ -25,8 +25,9 @@ if not DATABASE_PATH.is_absolute():
 
 TOP_N = int(os.getenv("TOP_N", 5))
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 0))
+OCR_GPU = os.getenv("OCR_GPU", "l4-spot")
 OCR_WAIT_FOR_CAPACITY = os.getenv("OCR_WAIT_FOR_CAPACITY", "false").lower() == "true"
-OCR_PROVISION_TIMEOUT_S = int(os.getenv("OCR_PROVISION_TIMEOUT_S", 30))
+OCR_PROVISION_TIMEOUT_S = int(os.getenv("OCR_PROVISION_TIMEOUT_S", 900))
 DB_FIELDS = ("wine_name", "winery_name", "region_name", "country_name")
 
 
@@ -123,7 +124,7 @@ def textract(image: Image.Image) -> dict[str, Any]:
         "microsoft/Florence-2-base",
         Item(images=[{"data": image, "format": "png"}]),
         options={"task": "<OCR_WITH_REGION>"},
-        gpu="l4-spot",
+        gpu=OCR_GPU,
         wait_for_capacity=OCR_WAIT_FOR_CAPACITY,
         provision_timeout_s=OCR_PROVISION_TIMEOUT_S,
     )
