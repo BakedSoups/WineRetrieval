@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { analyzeFlavorPrompt, detectWineFromImage, fetchCatalog, fetchRecommendations } from "@/lib/api"
+import { detectWineFromImage, fetchCatalog, fetchRecommendations } from "@/lib/api"
 import { type FlavorCategory, type RecommendedWine, type Wine, type WineStructure } from "@/lib/wine-data"
 import { WineResultCard } from "./wine-result-card"
 import { WineGlassVisual } from "./wine-glass-visual"
@@ -17,7 +17,6 @@ import {
 import {
   Wine as WineIcon,
   Search,
-  Sparkles,
   ArrowLeft,
   SlidersHorizontal,
   X,
@@ -88,8 +87,6 @@ export function WineRecommender() {
   const [view, setView] = useState<View>("profile")
   const [structure, setStructure] = useState<WineStructure>(defaultStructure)
   const [selectedFlavors, setSelectedFlavors] = useState<string[]>([])
-  const [flavorQuery, setFlavorQuery] = useState("")
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [selectedReferenceWine, setSelectedReferenceWine] = useState<string>("")
   const [wineSearchQuery, setWineSearchQuery] = useState("")
   const [wineSearchFocused, setWineSearchFocused] = useState(false)
@@ -188,24 +185,6 @@ export function WineRecommender() {
         ? prev.filter((item) => item !== flavor)
         : [...prev, flavor]
     )
-  }
-
-  const handleFlavorQuerySubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!flavorQuery.trim()) return
-
-    try {
-      setIsAnalyzing(true)
-      setErrorMessage("")
-      const response = await analyzeFlavorPrompt(flavorQuery.trim())
-      setStructure(response.structure)
-      setSelectedFlavors((prev) => [...new Set([...prev, ...response.flavors])])
-      setFlavorQuery("")
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to analyze flavor prompt.")
-    } finally {
-      setIsAnalyzing(false)
-    }
   }
 
   const handleFindWines = async () => {
@@ -533,34 +512,6 @@ export function WineRecommender() {
 
           <div className="space-y-6 min-w-0">
             <div className="rounded-2xl border border-border bg-card p-5">
-              <form onSubmit={handleFlavorQuerySubmit} className="flex gap-3">
-                <div className="relative flex-1">
-                  <Input
-                    value={flavorQuery}
-                    onChange={(e) => setFlavorQuery(e.target.value)}
-                    placeholder="Describe what you're looking for... (e.g., 'bold and rich with dark fruit')"
-                    className="h-11 bg-background text-sm"
-                    disabled={isAnalyzing}
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  disabled={isAnalyzing || !flavorQuery.trim()}
-                  className="h-11 px-5"
-                >
-                  {isAnalyzing ? (
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      <span className="hidden sm:inline">Adjust</span>
-                    </span>
-                  )}
-                </Button>
-              </form>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-foreground">
                   Start from a wine you love
@@ -644,8 +595,8 @@ export function WineRecommender() {
                 </div>
               )}
 
-              {referenceWine ? (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10">
+              {referenceWine && (
+                <div className="mb-4 flex items-center gap-3 rounded-xl border border-primary/10 bg-primary/5 p-3">
                   <div className="w-10 h-14 rounded bg-gradient-to-b from-primary/20 to-primary/40 flex items-center justify-center">
                     <WineIcon className="h-5 w-5 text-primary" />
                   </div>
@@ -667,53 +618,53 @@ export function WineRecommender() {
                     <X className="h-4 w-4 text-muted-foreground" />
                   </button>
                 </div>
-              ) : (
-                <div className="relative">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      value={wineSearchQuery}
-                      onChange={(e) => setWineSearchQuery(e.target.value)}
-                      onFocus={() => setWineSearchFocused(true)}
-                      onBlur={() => setTimeout(() => setWineSearchFocused(false), 200)}
-                      placeholder={isCatalogLoading ? "Loading wines..." : "Search demo wines..."}
-                      className="h-11 pl-10 bg-background"
-                      disabled={isCatalogLoading}
-                    />
-                  </div>
-
-                  {wineSearchFocused && wineSearchQuery.trim() && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-20">
-                      {filteredWineResults.length > 0 ? (
-                        <div className="max-h-64 overflow-y-auto">
-                          {filteredWineResults.map((wine) => (
-                            <button
-                              key={wine.id}
-                              onClick={() => handleSelectWineFromSearch(wine.id)}
-                              className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors text-left"
-                            >
-                              <div className="w-8 h-10 rounded bg-gradient-to-b from-primary/10 to-primary/30 flex items-center justify-center shrink-0">
-                                <WineIcon className="h-3.5 w-3.5 text-primary/60" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-foreground truncate">{wine.name}</p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {wine.vintage} · {wine.region}
-                                </p>
-                              </div>
-                              <span className="text-xs text-muted-foreground">${wine.price ?? "-"}</span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="p-4 text-center text-sm text-muted-foreground">
-                          No wines found
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
               )}
+
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={wineSearchQuery}
+                    onChange={(e) => setWineSearchQuery(e.target.value)}
+                    onFocus={() => setWineSearchFocused(true)}
+                    onBlur={() => setTimeout(() => setWineSearchFocused(false), 200)}
+                    placeholder={isCatalogLoading ? "Loading wines..." : "Search wines..."}
+                    className="h-11 pl-10 bg-background"
+                    disabled={isCatalogLoading}
+                  />
+                </div>
+
+                {wineSearchFocused && wineSearchQuery.trim() && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-20">
+                    {filteredWineResults.length > 0 ? (
+                      <div className="max-h-64 overflow-y-auto">
+                        {filteredWineResults.map((wine) => (
+                          <button
+                            key={wine.id}
+                            onClick={() => handleSelectWineFromSearch(wine.id)}
+                            className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors text-left"
+                          >
+                            <div className="w-8 h-10 rounded bg-gradient-to-b from-primary/10 to-primary/30 flex items-center justify-center shrink-0">
+                              <WineIcon className="h-3.5 w-3.5 text-primary/60" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{wine.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {wine.vintage} · {wine.region}
+                              </p>
+                            </div>
+                            <span className="text-xs text-muted-foreground">${wine.price ?? "-"}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        No wines found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-5">
