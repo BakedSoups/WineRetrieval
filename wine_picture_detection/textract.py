@@ -26,7 +26,7 @@ if not DATABASE_PATH.is_absolute():
 TOP_N = int(os.getenv("TOP_N", 5))
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 0))
 OCR_GPU = os.getenv("OCR_GPU", "l4-spot")
-OCR_WAIT_FOR_CAPACITY = os.getenv("OCR_WAIT_FOR_CAPACITY", "false").lower() == "true"
+OCR_WAIT_FOR_CAPACITY = True
 OCR_PROVISION_TIMEOUT_S = int(os.getenv("OCR_PROVISION_TIMEOUT_S", 900))
 DB_FIELDS = ("wine_name", "winery_name", "region_name", "country_name")
 
