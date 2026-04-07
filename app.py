@@ -147,10 +147,8 @@ class DemoCatalog:
                     price_currency
                 FROM wines
                 ORDER BY wine_id
-                LIMIT ?
                 """,
                 connection,
-                params=(DEMO_MAX_WINES if DEMO_MAX_WINES > 0 else -1,),
             )
         finally:
             connection.close()
@@ -174,8 +172,6 @@ class DemoCatalog:
                 wines = self._load_from_sqlite()
             else:
                 wines = datasource.fetch_vivino_wines(num_pages=DEMO_NUM_PAGES)
-                if DEMO_MAX_WINES > 0:
-                    wines = wines.head(DEMO_MAX_WINES).copy()
 
                 wines = datasource.attach_vivino_reviews(
                     wines,
@@ -511,6 +507,8 @@ def recommendations(payload: RecommendationRequest):
         catalog.wine_matrix,
         top_k=payload.top_k,
     )
+    if DEMO_MAX_WINES > 0:
+        top_matches = top_matches[:DEMO_MAX_WINES]
     candidate_row_indices = [match["row_index"] for match in top_matches]
 
     if RERANK_METHOD == "custom":
