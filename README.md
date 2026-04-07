@@ -20,6 +20,11 @@ The duplicated database files and local `.env` setup are intentional. The goal i
 
 ## Running the Full Demo
 
+The full app runs through Docker Compose:
+
+- `backend`: FastAPI on `http://localhost:8000`
+- `frontend`: Next.js on `http://localhost:3000`
+
 From the repo root:
 
 ```bash
@@ -37,18 +42,13 @@ Stop it with:
 docker compose down
 ```
 
-The full app runs through Docker Compose:
-
-- `backend`: FastAPI on `http://localhost:8000`
-- `frontend`: Next.js on `http://localhost:3000`
-
 This setup supports the OCR flow as well, so the demo web app runs fully in Docker.
 
 ## Environment Files
 
-- The root app uses the root `.env`
+- The root app and `wine_flavor/` subproject use the root `.env`
 - `wine_picture_detection/` can also use its own local `.env` / `.env.example`
-- The duplicated setup is intentional so the subprojects can be run separately
+- The duplicated setup is intentional so both subprojects can be run individually
 
 If you are running the full demo, put the required backend keys in the root `.env`.
 
