@@ -62,7 +62,7 @@ export function WineRecommender() {
   const [isRecommendationsLoading, setIsRecommendationsLoading] = useState(false)
   const [isDetectingWine, setIsDetectingWine] = useState(false)
   const [detectedWine, setDetectedWine] = useState<Wine | null>(null)
-  const [detectionConfidence, setDetectionConfidence] = useState<number | null>(null)
+  const [detectionMatchScore, setDetectionMatchScore] = useState<number | null>(null)
   const [errorMessage, setErrorMessage] = useState<string>("")
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const photoLibraryInputRef = useRef<HTMLInputElement | null>(null)
@@ -110,7 +110,7 @@ export function WineRecommender() {
   const handleSelectWineFromSearch = (wineId: string) => {
     setSelectedReferenceWine(wineId)
     setDetectedWine(catalogWines.find((wine) => wine.id === wineId) ?? null)
-    setDetectionConfidence(null)
+    setDetectionMatchScore(null)
     setWineSearchQuery("")
     setWineSearchFocused(false)
   }
@@ -134,7 +134,7 @@ export function WineRecommender() {
     setStructure(defaultStructure)
     setSelectedReferenceWine("")
     setDetectedWine(null)
-    setDetectionConfidence(null)
+    setDetectionMatchScore(null)
   }
 
   const handleFlavorToggle = (flavor: string) => {
@@ -193,11 +193,11 @@ export function WineRecommender() {
       setErrorMessage("")
       setDetectedWine(null)
       setSelectedReferenceWine("")
-      setDetectionConfidence(null)
+      setDetectionMatchScore(null)
 
       const response = await detectWineFromImage(file)
       const detected = response.detected_wine
-      setDetectionConfidence(response.confidence)
+      setDetectionMatchScore(response.match_score)
 
       if (!detected) {
         setErrorMessage("Could not detect wine from image. Try a clearer label photo or pick the wine manually.")
@@ -527,16 +527,16 @@ export function WineRecommender() {
                 </button>
               </div>
 
-              {(detectedWine || detectionConfidence !== null) && (
+              {(detectedWine || detectionMatchScore !== null) && (
                 <div className="mb-4 rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-sm">
                   {detectedWine ? (
                     <p className="font-medium text-foreground">
                       {detectedWine.name} {detectedWine.vintage ? `· ${detectedWine.vintage}` : ""}
                     </p>
                   ) : null}
-                  {detectionConfidence !== null && (
+                  {detectionMatchScore !== null && (
                     <p className={cn("text-xs text-muted-foreground", detectedWine && "mt-1")}>
-                      Confidence: {Math.round(detectionConfidence * 100)}%
+                      Match score: {Math.round(detectionMatchScore * 100)}%
                     </p>
                   )}
                 </div>

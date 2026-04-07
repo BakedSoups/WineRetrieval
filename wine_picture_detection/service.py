@@ -17,13 +17,13 @@ ALLOWED_OCR_MODELS = {
 @dataclass
 class DetectedWine:
     wine_id: int | None
-    confidence: float
+    match_score: float
     ocr_text: str = ""
 
 
 def detect_wine_from_image_bytes(image_bytes: bytes) -> DetectedWine:
     if not image_bytes:
-        return DetectedWine(wine_id=None, confidence=0.0)
+        return DetectedWine(wine_id=None, match_score=0.0)
 
     if SIE_OCR_MODEL not in ALLOWED_OCR_MODELS:
         raise ValueError(
@@ -35,7 +35,7 @@ def detect_wine_from_image_bytes(image_bytes: bytes) -> DetectedWine:
         image = Image.open(BytesIO(image_bytes))
         image.load()
     except (UnidentifiedImageError, OSError):
-        return DetectedWine(wine_id=None, confidence=0.0)
+        return DetectedWine(wine_id=None, match_score=0.0)
 
     try:
         extracted_text, matched_labels = extract_and_match_image(image, top_n=1)
@@ -55,12 +55,12 @@ def detect_wine_from_image_bytes(image_bytes: bytes) -> DetectedWine:
     except Exception as exc:
         print("wine-image detection error:", repr(exc))
         traceback.print_exc()
-        return DetectedWine(wine_id=None, confidence=0.0)
+        return DetectedWine(wine_id=None, match_score=0.0)
 
     if not matched_labels:
         return DetectedWine(
             wine_id=None,
-            confidence=0.0,
+            match_score=0.0,
             ocr_text=extracted_blob,
         )
 
@@ -71,7 +71,7 @@ def detect_wine_from_image_bytes(image_bytes: bytes) -> DetectedWine:
             if best_match.get("wine_id") is not None
             else None
         ),
-        confidence=max(
+        match_score=max(
             0.0, min(1.0, float(best_match.get("match_score", 0.0)) / 100.0)
         ),
         ocr_text=extracted_blob,

@@ -19,7 +19,7 @@ def main() -> None:
 
     print(f"Image: {TEST_IMAGE}")
     print(f"Detected wine id: {detection.wine_id}")
-    print(f"Confidence: {detection.confidence:.4f}")
+    print(f"Match score: {detection.match_score:.4f}")
     print(f"OCR text: {detection.ocr_text}")
 
     if detection.wine_id is None:

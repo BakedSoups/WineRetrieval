@@ -14,7 +14,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from pydantic import BaseModel, Field
-from wine_flavor import datasource, engine, pretty_print, transforms
+from wine_flavor import datasource, service
 from wine_picture_detection import detect_wine_from_image_bytes
 
 load_dotenv()
@@ -179,14 +179,12 @@ class DemoCatalog:
                     language="en",
                 )
 
-            unique_flavors = transforms.unique_flavors(wines)
-            flavor_idf = engine.build_flavor_idf(wines)
-            wine_matrix = engine.build_wine_matrix(wines, unique_flavors, flavor_idf)
+            catalog_assets = service.load_catalog_assets(wines)
 
             self.wines = wines
-            self.unique_flavors = unique_flavors
-            self.flavor_idf = flavor_idf
-            self.wine_matrix = wine_matrix
+            self.unique_flavors = catalog_assets["unique_flavors"]
+            self.flavor_idf = catalog_assets["flavor_idf"]
+            self.wine_matrix = catalog_assets["wine_matrix"]
             self._loaded = True
 
 
@@ -479,82 +477,33 @@ def health():
 @app.get("/catalog")
 def catalog_view():
     catalog.load()
-    return jsonable_encoder(
-        {
-            "wines": [
-                _catalog_wine_record(wine_row)
-                for _, wine_row in catalog.wines.iterrows()
-            ],
-            "flavorTags": _build_flavor_tags(catalog.wines),
-        }
-    )
+    return jsonable_encoder(service.build_catalog_response(catalog.wines))
 
 
 @app.post("/recommendations")
 def recommendations(payload: RecommendationRequest):
     catalog.load()
     user_preferences = _request_to_preferences(payload)
-
-    user_vector = engine.build_user_vector(
-        user_preferences,
-        catalog.unique_flavors,
-        catalog.flavor_idf,
-    )
-    top_matches = engine.cosine_similarity_search(
-        user_vector,
-        catalog.wine_matrix,
-        top_k=payload.top_k,
-    )
-    candidate_row_indices = [match["row_index"] for match in top_matches]
-
-    if RERANK_METHOD == "custom":
-        reranked_matches = engine.rerank_wines_with_custom_embeddings(
+    return jsonable_encoder(
+        service.get_recommendations(
             catalog.wines,
-            candidate_row_indices,
-            user_preferences,
-            reference_row_indices=payload.reference_row_indices,
-            base_url=SIE_BASE_URL,
-            model_name=SIE_EMBEDDING_MODEL,
-            gpu=SIE_GPU,
-            provision_timeout_s=SIE_PROVISION_TIMEOUT_S,
-            a=CUSTOM_RERANK_A,
-            alpha=RERANK_ALPHA,
-            no_review_penalty=CUSTOM_RERANK_NO_REVIEW_PENALTY,
-        )
-    else:
-        reranked_matches = engine.rerank_wines_with_sie_reviews(
-            catalog.wines,
-            candidate_row_indices,
-            user_preferences,
             catalog.unique_flavors,
             catalog.flavor_idf,
+            catalog.wine_matrix,
+            user_preferences,
+            top_k=payload.top_k,
             reference_row_indices=payload.reference_row_indices,
-            alpha=RERANK_ALPHA,
-            max_terms=RERANK_MAX_TERMS,
+            rerank_method=RERANK_METHOD,
             base_url=SIE_BASE_URL,
-            model_name=SIE_RERANK_MODEL,
+            rerank_model=SIE_RERANK_MODEL,
+            embedding_model=SIE_EMBEDDING_MODEL,
             gpu=SIE_GPU,
             provision_timeout_s=SIE_PROVISION_TIMEOUT_S,
+            rerank_alpha=RERANK_ALPHA,
+            custom_rerank_a=CUSTOM_RERANK_A,
+            custom_rerank_no_review_penalty=CUSTOM_RERANK_NO_REVIEW_PENALTY,
+            rerank_max_terms=RERANK_MAX_TERMS,
         )
-
-    result_frame = pretty_print.build_results_frame(catalog.wines, reranked_matches)
-    result_records = []
-    for record in result_frame.to_dict(orient="records"):
-        wine_row = catalog.wines.iloc[record["row_index"]]
-        enriched_record = {
-            **record,
-            "style": _wine_style(wine_row),
-            "structure": _to_ui_structure_from_row(wine_row),
-            "flavors": _extract_wine_flavors(wine_row),
-        }
-        result_records.append(_normalize_record(enriched_record))
-
-    return jsonable_encoder(
-        {
-            "rerank_method": RERANK_METHOD,
-            "candidate_count": len(candidate_row_indices),
-            "results": [_to_recommendation_record(record) for record in result_records],
-        }
     )
 
 
@@ -626,7 +575,7 @@ async def detect_wine_image(file: UploadFile = File(...)):
     return jsonable_encoder(
         {
             "detected_wine": detected_wine,
-            "confidence": detection.confidence,
+            "match_score": detection.match_score,
             "ocr_text": detection.ocr_text,
         }
     )
