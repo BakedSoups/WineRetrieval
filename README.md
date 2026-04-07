@@ -20,38 +20,39 @@ The duplicated database files and local `.env` setup are intentional. The goal i
 
 ## Running the Full Demo
 
-Use the helper scripts from the repo root:
+From the repo root:
 
-- `./start.sh` starts the backend on the host and the frontend in Docker
-- `./stop.sh` stops both
+```bash
+docker compose up --build
+```
 
 App URLs:
 
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:8000`
 
+Stop it with:
+
+```bash
+docker compose down
+```
+
+The full app runs through Docker Compose:
+
+- `backend`: FastAPI on `http://localhost:8000`
+- `frontend`: Next.js on `http://localhost:3000`
+
+This Docker setup now supports the OCR flow as well, so the demo web app can run fully in containers.
+
 ## Environment Files
 
-- Root `app.py` uses the root `.env`
+- The root app uses the root `.env`
 - `wine_picture_detection/` can also use its own local `.env` / `.env.example`
 - The duplicated setup is intentional so the subprojects can be run separately
 
 If you are running the full demo, put the required backend keys in the root `.env`.
 
-## Why the Backend Runs on the Host
+## Notes
 
-The OCR flow calls an external SIE OCR endpoint defined by `CLUSTER_URL`.
-
-In this project, the host machine can reach that endpoint, but the Docker container cannot. The reliable setup for the demo is therefore:
-
-- backend on the host Python environment
-- frontend in Docker
-
-The browser talks to the backend at `http://localhost:8000`. The frontend container only hosts the Next.js dev server on `http://localhost:3000`.
-
-## Running the Subprojects Directly
-
-If you only want one feature, run it from its own folder:
-
-- OCR flow: see `wine_picture_detection/README.md`
-- Retrieval flow: see `wine_flavor/README.md`
+- This repo is optimized for demoing the product idea, not for production deployment or large-scale operation.
+- The main app is intentionally simple: `app.py` wires together the OCR module and the retrieval module rather than hiding them behind a larger service architecture.
