@@ -13,19 +13,18 @@ from .textract import extract_and_match_image, extract_blob
 class DetectedWine:
     wine_id: int | None
     confidence: float
-    detection_method: str
     ocr_text: str = ""
 
 
 def detect_wine_from_image_bytes(image_bytes: bytes) -> DetectedWine:
     if not image_bytes:
-        return DetectedWine(wine_id=None, confidence=0.0, detection_method="empty-image")
+        return DetectedWine(wine_id=None, confidence=0.0)
 
     try:
         image = Image.open(BytesIO(image_bytes))
         image.load()
     except (UnidentifiedImageError, OSError):
-        return DetectedWine(wine_id=None, confidence=0.0, detection_method="invalid-image")
+        return DetectedWine(wine_id=None, confidence=0.0)
 
     try:
         extracted_text, matched_labels = extract_and_match_image(image, top_n=1)
@@ -43,16 +42,14 @@ def detect_wine_from_image_bytes(image_bytes: bytes) -> DetectedWine:
             },
         )
     except Exception as exc:
-        error_name = exc.__class__.__name__.lower().replace("_", "-")
         print("wine-image detection error:", repr(exc))
         traceback.print_exc()
-        return DetectedWine(wine_id=None, confidence=0.0, detection_method=f"ocr-error-{error_name}")
+        return DetectedWine(wine_id=None, confidence=0.0)
 
     if not matched_labels:
         return DetectedWine(
             wine_id=None,
             confidence=0.0,
-            detection_method="sie-florence-no-match",
             ocr_text=extracted_blob,
         )
 
@@ -60,6 +57,5 @@ def detect_wine_from_image_bytes(image_bytes: bytes) -> DetectedWine:
     return DetectedWine(
         wine_id=int(best_match["wine_id"]) if best_match.get("wine_id") is not None else None,
         confidence=max(0.0, min(1.0, float(best_match.get("match_score", 0.0)) / 100.0)),
-        detection_method="sie-florence-fuzzy-match",
         ocr_text=extracted_blob,
     )

@@ -44,45 +44,6 @@ const structureLabels = {
   tannin: { label: "Tannin", low: "Smooth", high: "Grippy" },
 }
 
-function getDetectionMessage(detectionMethod: string) {
-  if (detectionMethod === "sie-florence-no-match") {
-    return "No wine match found for that image. Try a clearer label photo or pick the wine manually."
-  }
-
-  if (detectionMethod === "invalid-image") {
-    return "That file could not be read as an image. Try a JPG, PNG, or WebP photo."
-  }
-
-  if (detectionMethod.startsWith("ocr-error-sieconnectionerror")) {
-    return "The OCR service is unavailable right now. Try again later or pick the wine manually."
-  }
-
-  if (detectionMethod.startsWith("ocr-error-")) {
-    return "OCR could not process that image. Try a clearer label photo or pick the wine manually."
-  }
-
-  return "No wine match found for that image. Try a clearer label photo or pick the wine manually."
-}
-
-function formatDetectionMethod(detectionMethod: string) {
-  switch (detectionMethod) {
-    case "sie-florence-fuzzy-match":
-      return "OCR matched label text"
-    case "sie-florence-no-match":
-      return "OCR found text but no catalog match"
-    case "invalid-image":
-      return "Unsupported image"
-    default:
-      if (detectionMethod.startsWith("ocr-error-sieconnectionerror")) {
-        return "OCR service unavailable"
-      }
-      if (detectionMethod.startsWith("ocr-error-")) {
-        return "OCR failed"
-      }
-      return detectionMethod
-    }
-}
-
 export function WineRecommender() {
   const [view, setView] = useState<View>("profile")
   const [structure, setStructure] = useState<WineStructure>(defaultStructure)
@@ -102,7 +63,6 @@ export function WineRecommender() {
   const [isDetectingWine, setIsDetectingWine] = useState(false)
   const [detectedWine, setDetectedWine] = useState<Wine | null>(null)
   const [detectionConfidence, setDetectionConfidence] = useState<number | null>(null)
-  const [detectionMethod, setDetectionMethod] = useState<string>("")
   const [errorMessage, setErrorMessage] = useState<string>("")
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const photoLibraryInputRef = useRef<HTMLInputElement | null>(null)
@@ -151,7 +111,6 @@ export function WineRecommender() {
     setSelectedReferenceWine(wineId)
     setDetectedWine(catalogWines.find((wine) => wine.id === wineId) ?? null)
     setDetectionConfidence(null)
-    setDetectionMethod("")
     setWineSearchQuery("")
     setWineSearchFocused(false)
   }
@@ -176,7 +135,6 @@ export function WineRecommender() {
     setSelectedReferenceWine("")
     setDetectedWine(null)
     setDetectionConfidence(null)
-    setDetectionMethod("")
   }
 
   const handleFlavorToggle = (flavor: string) => {
@@ -236,15 +194,13 @@ export function WineRecommender() {
       setDetectedWine(null)
       setSelectedReferenceWine("")
       setDetectionConfidence(null)
-      setDetectionMethod("")
 
       const response = await detectWineFromImage(file)
       const detected = response.detected_wine
       setDetectionConfidence(response.confidence)
-      setDetectionMethod(response.detection_method)
 
       if (!detected) {
-        setErrorMessage(getDetectionMessage(response.detection_method))
+        setErrorMessage("Could not detect wine from image. Try a clearer label photo or pick the wine manually.")
         return
       }
 
@@ -522,7 +478,6 @@ export function WineRecommender() {
                       setSelectedReferenceWine("")
                       setDetectedWine(null)
                       setDetectionConfidence(null)
-                      setDetectionMethod("")
                     }}
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
@@ -572,24 +527,16 @@ export function WineRecommender() {
                 </button>
               </div>
 
-              {(detectedWine || detectionMethod) && (
+              {(detectedWine || detectionConfidence !== null) && (
                 <div className="mb-4 rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-sm">
-                  <p className="font-medium text-foreground">
-                    {detectedWine ? "Detected wine" : "OCR finished"}
-                  </p>
                   {detectedWine ? (
-                    <p className="text-muted-foreground">
+                    <p className="font-medium text-foreground">
                       {detectedWine.name} {detectedWine.vintage ? `· ${detectedWine.vintage}` : ""}
                     </p>
-                  ) : (
-                    <p className="text-muted-foreground">
-                      No catalog match found from the uploaded image.
-                    </p>
-                  )}
+                  ) : null}
                   {detectionConfidence !== null && (
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className={cn("text-xs text-muted-foreground", detectedWine && "mt-1")}>
                       Confidence: {Math.round(detectionConfidence * 100)}%
-                      {detectionMethod ? ` · ${formatDetectionMethod(detectionMethod)}` : ""}
                     </p>
                   )}
                 </div>
@@ -611,7 +558,6 @@ export function WineRecommender() {
                       setSelectedReferenceWine("")
                       setDetectedWine(null)
                       setDetectionConfidence(null)
-                      setDetectionMethod("")
                     }}
                     className="p-1.5 rounded-full hover:bg-muted transition-colors"
                   >

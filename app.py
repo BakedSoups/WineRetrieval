@@ -595,7 +595,6 @@ async def detect_wine_image(file: UploadFile = File(...)):
     return jsonable_encoder({
         "detected_wine": detected_wine,
         "confidence": detection.confidence,
-        "detection_method": detection.detection_method,
         "ocr_text": detection.ocr_text,
     })
 
