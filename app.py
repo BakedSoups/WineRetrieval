@@ -67,7 +67,6 @@ ALLOWED_SIE_RERANK_MODELS = {
 }
 ALLOWED_RERANK_METHODS = {"standard", "custom"}
 DEMO_NUM_PAGES = _require_int_env("DEMO_NUM_PAGES", 5)
-DEMO_MAX_WINES = _require_int_env("DEMO_MAX_WINES", 200)
 REVIEWS_PER_WINE = _require_int_env("REVIEWS_PER_WINE", 5)
 REVIEW_PAGES = _require_int_env("REVIEW_PAGES", 1)
 COSINE_TOP_K = _require_int_env("COSINE_TOP_K", 20)
@@ -474,7 +473,6 @@ def health():
         "rerank_method": RERANK_METHOD,
         "catalog_loaded": catalog._loaded,
         "demo_num_pages": DEMO_NUM_PAGES,
-        "demo_max_wines": DEMO_MAX_WINES,
     }
 
 
@@ -507,8 +505,6 @@ def recommendations(payload: RecommendationRequest):
         catalog.wine_matrix,
         top_k=payload.top_k,
     )
-    if DEMO_MAX_WINES > 0:
-        top_matches = top_matches[:DEMO_MAX_WINES]
     candidate_row_indices = [match["row_index"] for match in top_matches]
 
     if RERANK_METHOD == "custom":
