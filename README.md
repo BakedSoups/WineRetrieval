@@ -42,7 +42,7 @@ The full app runs through Docker Compose:
 - `backend`: FastAPI on `http://localhost:8000`
 - `frontend`: Next.js on `http://localhost:3000`
 
-This Docker setup now supports the OCR flow as well, so the demo web app can run fully in containers.
+This setup supports the OCR flow as well, so the demo web app runs fully in Docker.
 
 ## Environment Files
 
