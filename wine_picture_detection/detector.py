@@ -6,7 +6,12 @@ from io import BytesIO
 
 from PIL import Image, UnidentifiedImageError
 
-from .textract import extract_and_match_image, extract_blob
+from .textract import SIE_OCR_MODEL, extract_and_match_image, extract_blob
+
+ALLOWED_OCR_MODELS = {
+    "microsoft/Florence-2-base",
+    "microsoft/Florence-2-large",
+}
 
 
 @dataclass
@@ -19,6 +24,12 @@ class DetectedWine:
 def detect_wine_from_image_bytes(image_bytes: bytes) -> DetectedWine:
     if not image_bytes:
         return DetectedWine(wine_id=None, confidence=0.0)
+
+    if SIE_OCR_MODEL not in ALLOWED_OCR_MODELS:
+        raise ValueError(
+            f"Unsupported OCR model '{SIE_OCR_MODEL}'. "
+            f"Choose one of: {sorted(ALLOWED_OCR_MODELS)}"
+        )
 
     try:
         image = Image.open(BytesIO(image_bytes))

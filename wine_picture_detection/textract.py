@@ -25,6 +25,7 @@ if not DATABASE_PATH.is_absolute():
 
 TOP_N = int(os.getenv("TOP_N", 5))
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 0))
+SIE_OCR_MODEL = os.getenv("SIE_OCR_MODEL", "microsoft/Florence-2-base")
 OCR_GPU = os.getenv("OCR_GPU", "l4-spot")
 OCR_WAIT_FOR_CAPACITY = True
 OCR_PROVISION_TIMEOUT_S = int(os.getenv("OCR_PROVISION_TIMEOUT_S", 900))
@@ -121,7 +122,7 @@ def textract(image: Image.Image) -> dict[str, Any]:
 
     sie_client = SIEClient(cluster_url, api_key=api_key)
     return sie_client.extract(
-        "microsoft/Florence-2-base",
+        SIE_OCR_MODEL,
         Item(images=[{"data": image, "format": "png"}]),
         options={"task": "<OCR_WITH_REGION>"},
         gpu=OCR_GPU,
