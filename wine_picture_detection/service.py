@@ -6,12 +6,12 @@ from io import BytesIO
 
 from PIL import Image, UnidentifiedImageError
 
-from .textract import SIE_OCR_MODEL, extract_and_match_image, extract_blob
-
-ALLOWED_OCR_MODELS = {
-    "microsoft/Florence-2-base",
-    "microsoft/Florence-2-large",
-}
+from .textract import (
+    SIE_OCR_MODEL,
+    ALLOWED_OCR_MODELS,
+    extract_and_match_image,
+    extract_blob,
+)
 
 
 @dataclass

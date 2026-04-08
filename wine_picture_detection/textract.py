@@ -7,7 +7,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 from rapidfuzz import fuzz
-from service import ALLOWED_OCR_MODELS
+import cv2
 
 import numpy as np
 from dotenv import load_dotenv
@@ -29,6 +29,10 @@ API_KEY = os.getenv("API_KEY")
 TOP_N = int(os.getenv("TOP_N", 5))
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 0))
 SIE_OCR_MODEL = os.getenv("SIE_OCR_MODEL", "microsoft/Florence-2-base")
+ALLOWED_OCR_MODELS = {
+    "microsoft/Florence-2-base",
+    "microsoft/Florence-2-large",
+}
 OCR_GPU = os.getenv("OCR_GPU", "l4-spot")
 OCR_WAIT_FOR_CAPACITY = True
 OCR_PROVISION_TIMEOUT_S = int(os.getenv("OCR_PROVISION_TIMEOUT_S", 900))
@@ -101,9 +105,9 @@ def _require_sie_sdk():
 
 def textract(image: Image.Image) -> dict[str, Any]:
     SIE_CLIENT, Item = _require_sie_sdk()
-    sie_client = SIE_CLIENT(CLUSTER_URL, API_KEY)
+    sie_client = SIE_CLIENT(CLUSTER_URL, api_key=API_KEY)
 
-    return sie_client(CLUSTER_URL, api_key=API_KEY).extract(
+    return sie_client.extract(
         SIE_OCR_MODEL,
         Item(images=[{"data": image, "format": "png"}]),
         options={"task": "<OCR_WITH_REGION>"},
@@ -285,6 +289,14 @@ def match_label(label_data: dict, top_n: int = TOP_N) -> list[dict]:
     return [wine for wine in scored if wine["match_score"] >= SCORE_THRESHOLD][:top_n]
 
 
+def extract_and_match_image(
+    image: Image.Image, top_n: int = TOP_N
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    extracted = textract(image)
+    matches = match_label(extracted, top_n=top_n)
+    return extracted, matches
+
+
 # Fuzzy Match <<<
 
 # DEBUG >>>
@@ -343,12 +355,11 @@ def main():
     image_quality = check_quality(wine_label)
     print(f"\nImage quality:\n{image_quality}")
 
-    # Extract text
-    extracted_text = textract(wine_label)
+    # Extract text and fuzzy match with known wines
+    extracted_text, matched_labels = extract_and_match_image(
+        wine_label, top_n=args.top_n
+    )
     print(f"\nOCR output:\n{extracted_text}\n")
-
-    # Fuzzy match with known wines
-    matched_labels: list[dict] = match_label(extracted_text, top_n=args.top_n)
     # print(f"\nMatched Labels:")
     # [print(dictionary) for dictionary in matched_labels] # DEBUG
 
