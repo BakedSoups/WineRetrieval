@@ -6,7 +6,9 @@ It combines:
 
 - Vivino wine metadata and tasting attributes
 - in-memory vector retrieval over structure + flavor signals
-- SIE-based reranking or embedding-based refinement
+- SIE-based reranking methods, using both the [encode](https://sie.dev/docs/encode) and [score](https://sie.dev/docs/score) capabilities of the SIE.
+
+This is a good SIE demo because it shows how a stronger model can be added only where it matters most: after fast candidate retrieval, at the ranking stage.
 
 ## What It Does
 
@@ -22,15 +24,19 @@ In the full demo, this logic is wired into the root `app.py`. This folder exists
 
 ## Why SIE Fits This Use Case
 
-SIE is a good fit here because initial retrieval is cheap and local, but final ranking benefits from stronger semantic understanding.
+SIE is a good fit here because initial retrieval is cheap, but final ranking benefits from stronger semantic understanding.
 
 That makes the split useful:
 
 - local vector search narrows the candidate set fast
-- SIE reranking or embeddings improve the final ordering
+- SIE reranking methods improve the final ordering
 - the demo can compare a standard reranker against a custom embedding-based approach
 
-This is a good SIE use case because the value is not in replacing the whole system with one model call. The value is in adding a stronger semantic ranking step on top of a simple retrieval pipeline.
+This is a good SIE use case because the value is not in replacing the whole system with one model call. The value is in adding a stronger semantic ranking step on top of a simple retrieval pipeline. By allowing the use of multiple models on one GPU, SIE enables the custom semantic layer which tailors the recommended products to the user request.
+
+## Pre-requisite
+
+In order to run this demo, you will need to start the SIE server. Please refer to the [SIE quickstart page](https://sie.dev/docs/quickstart) for detailed instructions
 
 ## Setup
 
@@ -79,6 +85,4 @@ python test/compare_rerank_methods.py
 1. Fetch wines from Vivino or load from the local database
 2. Build wine vectors from structure + flavors
 3. Retrieve top candidates with cosine similarity
-4. Rerank candidates with standard SIE reranking or custom embedding-based reranking
-
-At the bottom line, this is a good SIE demo because it shows how a stronger model can be added only where it matters most: after fast candidate retrieval, at the ranking stage.
+4. Rerank candidates with standard SIE reranking (with the [score](https://sie.dev/docs/score) method) or custom embedding-based reranking (with the [encode](https://sie.dev/docs/encode) method)
