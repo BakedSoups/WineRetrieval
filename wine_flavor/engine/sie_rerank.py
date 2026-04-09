@@ -106,6 +106,7 @@ def rerank_wines_with_sie_reviews(
     base_url=None,
     model_name="BAAI/bge-reranker-v2-m3",
     gpu=None,
+    provision_timeout_s=900,
 ):
     try:
         from sie_sdk import SIEClient
@@ -147,7 +148,7 @@ def rerank_wines_with_sie_reviews(
                 review_items,
                 gpu=gpu,
                 wait_for_capacity=True,
-                provision_timeout_s=900,
+                provision_timeout_s=provision_timeout_s,
             )
 
             for score_entry in score_result.get("scores", []):
