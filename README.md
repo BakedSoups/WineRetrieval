@@ -18,6 +18,33 @@ The duplicated database files (`wine_flavor.db`) and local `.env` setup are inte
 - `wine_flavor/`: standalone retrieval and reranking prototype
 - `wine_picture_detection/`: standalone OCR and label-matching prototype
 
+## Schema Design
+
+### Wine Recommendation
+
+```mermaid
+flowchart TD;
+    A1["User preferences"] --> B["Normalization"];
+    A2["Wine structural and flavor Attributes"] --> B;
+    B --> C["Vectorization from user preferences and wine attributes"];
+    C --> D["1st Retrieval - List of N candidates"];
+    D --> E["Pull reviews for candidate wines"];
+    E --> F1["Standard reranking on candidate reviews"];
+    E --> F2["Custom reranking with embeddings on flavor profiles and reviews"];
+    F1 --> G1["Final Wine List"];
+    F2 --> G2["Final Wine List"];
+```
+
+### Wine Identification
+
+```mermaid
+flowchart TD;
+    A["Image upload"] --> B["Analysis of image quality"];
+    B --> C["OCR / Text extraction"];
+    C --> D["Score wines against the extracted content"];
+    D --> E["Wine identification"];
+```
+
 ## Pre-requisite
 
 In order to run this demo, you will need to start the SIE server. Please refer to the [SIE quickstart page](https://sie.dev/docs/quickstart) for detailed instructions

@@ -8,6 +8,16 @@ This module takes a wine label image, runs OCR on it, extracts the readable text
 
 The main demo app uses this same flow through `wine_picture_detection/service.py`, but this folder is meant to be runnable by itself as a separate project.
 
+## Schema Design
+
+```mermaid
+flowchart TD;
+    A["Image upload"] --> B["Analysis of image quality"];
+    B --> C["OCR / Text extraction"];
+    C --> D["Score wines against the extracted content"];
+    D --> E["Wine identification"];
+```
+
 ## Why SIE Fits This Use Case
 
 SIE is a good fit here because OCR is the core task and the use of different models allows to refine the content extracted for an improved matching rate.

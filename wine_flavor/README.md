@@ -22,6 +22,21 @@ The retrieval flow:
 
 In the full demo, this logic is wired into the root `app.py`. This folder exists so the retrieval work can also be understood and run as its own prototype.
 
+## Schema Design
+
+```mermaid
+flowchart TD;
+    A1["User preferences"] --> B["Normalization"];
+    A2["Wine structural and flavor Attributes"] --> B;
+    B --> C["Vectorization from user preferences and wine attributes"];
+    C --> D["1st Retrieval - List of N candidates"];
+    D --> E["Pull reviews for candidate wines"];
+    E --> F1["Standard reranking on candidate reviews"];
+    E --> F2["Custom reranking with embeddings on flavor profiles and reviews"];
+    F1 --> G1["Final Wine List"];
+    F2 --> G2["Final Wine List"];
+```
+
 ## Why SIE Fits This Use Case
 
 SIE is a good fit here because initial retrieval is cheap, but final ranking benefits from stronger semantic understanding.
