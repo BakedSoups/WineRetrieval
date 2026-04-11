@@ -355,30 +355,6 @@ def _select_detected_wine_record(wines, detected_wine_id=None):
     return None
 
 
-def _build_flavor_tags(wines):
-    grouped_flavors = {}
-
-    for _, wine_row in wines.iterrows():
-        for flavor_group in wine_row.get("wine_flavors", []) or []:
-            category = (flavor_group.get("group") or "other").replace("_", " ").title()
-            grouped_flavors.setdefault(category, set())
-            for keyword in flavor_group.get("primary_keywords") or []:
-                if keyword.get("name"):
-                    grouped_flavors[category].add(keyword["name"])
-            for keyword in flavor_group.get("secondary_keywords") or []:
-                if keyword.get("name"):
-                    grouped_flavors[category].add(keyword["name"])
-
-    return [
-        {
-            "category": category,
-            "flavors": sorted(list(flavors)),
-        }
-        for category, flavors in sorted(grouped_flavors.items())
-        if flavors
-    ]
-
-
 def _prompt_flavor_adjustment(prompt: str, available_flavors: list[str]) -> dict:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -412,26 +388,6 @@ def _prompt_flavor_adjustment(prompt: str, available_flavors: list[str]) -> dict
         return json.loads(output_text)
     except json.JSONDecodeError as exc:
         raise ValueError(f"OpenAI returned invalid JSON: {output_text}") from exc
-
-
-def _to_recommendation_record(record):
-    score = float(record.get("rerank_score") or 0.0)
-    return {
-        "id": str(record.get("wine_id")),
-        "name": record.get("wine_name"),
-        "winery": record.get("winery_name"),
-        "vintage": record.get("vintage_year"),
-        "country": record.get("country_name"),
-        "region": record.get("region_name"),
-        "style": record.get("style"),
-        "price": record.get("price_amount"),
-        "matchPercentage": max(0, min(100, int(round(score * 100)))),
-        "flavorSummary": ", ".join(record.get("flavors", [])),
-        "structure": record.get("structure"),
-        "flavors": record.get("flavors", []),
-        "reviewCount": record.get("review_count"),
-        "rerankScore": score,
-    }
 
 
 @asynccontextmanager
