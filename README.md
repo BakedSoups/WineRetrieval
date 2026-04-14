@@ -59,7 +59,28 @@ flowchart TD;
 
 ## Pre-requisite
 
+### Get your SIE credentials
+
+This demo does not bundle an SIE server - you bring your own. You need:
+
+- **`CLUSTER_URL`**: the URL of a running SIE cluster you can reach from the machine that runs the backend container
+- **`API_KEY`**: a valid API key for that cluster
+
+You can get these either by:
+
+1. **Self-hosting SIE** - see the [SIE quickstart](https://sie.dev/docs/quickstart) to run an SIE server locally or on your own infrastructure, then use that `CLUSTER_URL` and issue yourself an `API_KEY` from the server config
+2. **Using a managed SIE cluster** - grab the `CLUSTER_URL` and `API_KEY` from your SIE dashboard
+
+Background on the SIE primitives this demo uses:
+
 In order to run this demo, you will need to start the SIE server. Please refer to the [SIE quickstart page](https://sie.dev/docs/quickstart) for detailed instructions
+- [`encode`](https://sie.dev/docs/encode) - dense embeddings for tasting notes and reviews (used by the "custom" reranker)
+- [`score`](https://sie.dev/docs/score) - cross-encoder reranking (used by the "standard" reranker)
+- [`extract`](https://sie.dev/docs/extract) - OCR-style extraction on wine label images
+
+### Docker and Docker Compose
+
+You need Docker and Docker Compose v2 installed. The backend builds against `python:3.12-slim`, so no local Python setup is required.
 
 ## Running the full Demo
 
@@ -71,6 +92,7 @@ The full app runs through Docker Compose:
 From the repo root:
 
 ```bash
+cp .env.example .env           # edit .env and fill in CLUSTER_URL and API_KEY
 docker compose up --build
 ```
 Make sure ports `3000` and `8000` are free before starting the stack.
@@ -88,11 +110,18 @@ docker compose down
 
 ## Environment Files
 
-- The root app and `wine_flavor/` subproject use the root `.env`
-- `wine_picture_detection/` can also use its own local `.env` / `.env.example`
+- The root app and `wine_flavor/` subproject use the root `.env` (copy from `env.example`)
+- `wine_picture_detection/` can also use its own local `.env` / `.env.example` when you run tat subproject standalone
 - The duplicated setup is intentional so both subprojects can be run individually
 
 If you are running the full demo, put the required backend keys in the root `.env`.
+
+## Reranker Modes
+
+The recommendation flow supports two reranking strategies, selected via `RERANK_METHOD` in `.env`:
+
+- **`custom`** (default): calls SIE [`encode`](https://sie.dev/docs/encode) on generated tasting notes and (when available) per-wine reviews, then cosine-scores candidates against the user query embedding. Works out of the box with the bundled SQLite catalog, which has structured taste and flavor attributes but no per-wine reviews.
+- **`standard`**: calls SIE [`score`](https://sie.dev/docs/score) to rerank each candidate wine's reviews against structure and flavor prompt terms. This mode only produces meaningful scores when wines have reviews - the bundled catalog ships without reviews, so every wine will get a zero rerank score in `standard` mode. If you want to try `standard` mode, re-run the database ingestion under `wine_flavor/db_creation.py` to fetch reviews from Vivino.
 
 ## What To Try
 
