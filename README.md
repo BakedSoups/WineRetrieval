@@ -1,6 +1,6 @@
 # WineRetrieval
 
-This example is mostly a demo app, not a scaled production system. It is meant to demonstrate the capabilities of the [SIE](https://sie.dev/docs/).
+WineRetrieval is a runnable demo app that shows how to combine retrieval, reranking, and OCR-style extraction with [SIE](https://sie.dev/docs/). You can use it to explore wine recommendations from taste preferences, then switch to label detection from an uploaded bottle image.
 
 It wires together two separate prototype features:
 
@@ -10,6 +10,18 @@ It wires together two separate prototype features:
 Those two pieces are connected through the root `app.py` so you can try them in one UI, but they are also meant to be runnable on their own from inside their own folders. Please refer to the instructions in the README in each sub-folder to do so.
 
 The duplicated database files (`wine_flavor.db`) and local `.env` setup are intentional. The goal is to let someone open either subproject directly and run it in isolation without depending on the full root app setup.
+
+## What You Can Do
+
+- Enter flavor and structure preferences to get wine recommendations
+- Compare recommendation behavior across different reranking approaches
+- Upload a wine label image and inspect the OCR-driven bottle matching flow
+
+## Why The OCR Flow Matters
+
+The OCR side of the demo shows that SIE is not only useful for text retrieval. In this example, `extract` is used to pull readable text from a bottle label image, then that text is matched against the local wine catalog to identify the bottle.
+
+This is important because real product flows often combine search and extraction rather than using only one primitive. A user may not know the exact wine name, but they may still have a label photo. The OCR path turns that image into usable text and then connects it back to the recommendation and catalog experience.
 
 ## Project Structure
 
