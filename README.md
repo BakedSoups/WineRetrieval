@@ -73,6 +73,7 @@ From the repo root:
 ```bash
 docker compose up --build
 ```
+Make sure ports `3000` and `8000` are free before starting the stack.
 
 App URLs:
 
