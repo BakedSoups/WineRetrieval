@@ -94,6 +94,15 @@ docker compose down
 
 If you are running the full demo, put the required backend keys in the root `.env`.
 
+## What To Try
+
+1. Start the full app and open `http://localhost:3000`.
+2. Try recommendation queries with different structure preferences such as:
+   `high acidity + low sweetness`
+   `full-bodied + high tannin`
+3. Upload the sample wine label or your own label image and inspect the detected wine match.
+4. Check your recommended wines based on the query and the reference wine from the label
+
 ## Notes
 
 - This repo is optimized for demoing the product idea, not for production deployment or large-scale operation.
