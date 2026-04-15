@@ -57,7 +57,7 @@ flowchart TD;
     D --> E["Wine identification"];
 ```
 
-## Pre-requisite
+## Pre-requisites
 
 ### Get your SIE credentials
 
@@ -73,7 +73,6 @@ You can get these either by:
 
 Background on the SIE primitives this demo uses:
 
-In order to run this demo, you will need to start the SIE server. Please refer to the [SIE quickstart page](https://sie.dev/docs/quickstart) for detailed instructions
 - [`encode`](https://sie.dev/docs/encode) - dense embeddings for tasting notes and reviews (used by the "custom" reranker)
 - [`score`](https://sie.dev/docs/score) - cross-encoder reranking (used by the "standard" reranker)
 - [`extract`](https://sie.dev/docs/extract) - OCR-style extraction on wine label images
