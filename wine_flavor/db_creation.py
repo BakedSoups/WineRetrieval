@@ -2,7 +2,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-import datasource
+from . import datasource
 
 DB_PATH = Path("wine_flavor.db")
 STATE_PATH = Path("db_creation_state.json")

@@ -16,6 +16,8 @@ eggs/
 .eggs/
 lib/
 lib64/
+!app/lib/
+!app/lib/**
 parts/
 sdist/
 var/
@@ -205,3 +207,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# WineRetrieval app runtime artifacts
+.run/
+app/node_modules/
+app/.next/
+npm-debug.log*

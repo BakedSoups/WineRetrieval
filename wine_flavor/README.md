@@ -1,26 +1,67 @@
 # Wine Flavor
 
-Prototype wine recommender using:
-- Vivino wine metadata
-- in-memory vector retrieval
-- SIE-based reranking
+This folder contains the standalone wine retrieval prototype used by the demo app.
+
+It combines:
+
+- Vivino wine metadata and tasting attributes
+- in-memory vector retrieval over structure + flavor signals
+- SIE-based reranking methods, using both the [encode](https://sie.dev/docs/encode) and [score](https://sie.dev/docs/score) capabilities of the SIE.
+
+This is a good SIE demo because it shows how a stronger model can be added only where it matters most: after fast candidate retrieval, at the ranking stage.
+
+## What It Does
+
+This module starts from structured preferences instead of free-text search.
+
+The retrieval flow:
+
+1. builds vectors from wine structure and flavor data
+2. retrieves a candidate set with cosine similarity
+3. uses SIE to rerank or embed the candidates for a better final ordering
+
+In the full demo, this logic is wired into the root `app.py`. This folder exists so the retrieval work can also be understood and run as its own prototype.
+
+## Schema Design
+
+```mermaid
+flowchart TD;
+    A1["User preferences"] --> B["Normalization"];
+    A2["Wine structural and flavor Attributes"] --> B;
+    B --> C["Vectorization from user preferences and wine attributes"];
+    C --> D["1st Retrieval - List of N candidates"];
+    D --> E["Pull reviews for candidate wines"];
+    E --> F1["Standard reranking on candidate reviews"];
+    E --> F2["Custom reranking with embeddings on flavor profiles and reviews"];
+    F1 --> G1["Final Wine List"];
+    F2 --> G2["Final Wine List"];
+```
+
+## Why SIE Fits This Use Case
+
+SIE is a good fit here because initial retrieval is cheap, but final ranking benefits from stronger semantic understanding.
+
+That makes the split useful:
+
+- local vector search narrows the candidate set fast
+- SIE reranking methods improve the final ordering
+- the demo can compare a standard reranker against a custom embedding-based approach
+
+This is a good SIE use case because the value is not in replacing the whole system with one model call. The value is in adding a stronger semantic ranking step on top of a simple retrieval pipeline. By allowing the use of multiple models on one GPU, SIE enables the custom semantic layer which tailors the recommended products to the user request.
+
+## Pre-requisite
+
+In order to run this demo, you will need to start the SIE server. Please refer to the [SIE quickstart page](https://sie.dev/docs/quickstart) for detailed instructions
 
 ## Setup
 
-Create a virtualenv, activate it, and install dependencies:
+From this folder:
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+cd wine_flavor
 ```
-note: we have sie_sdk in this requirements.txt you may need to install separately if you have issues with the installation. 
-```bash
-pip install sie_sdk
-```
-## Env
 
-Create a `.env` file with:
+Create a `.env` file with the required settings:
 
 ```env
 CLUSTER_URL=https://your-sie-cluster-url
@@ -31,41 +72,32 @@ SIE_EMBEDDING_MODEL=BAAI/bge-m3
 RERANK_ALPHA=0.7
 CUSTOM_RERANK_A=0.75
 CUSTOM_RERANK_NO_REVIEW_PENALTY=0.5
+DEMO_NUM_PAGES=5
 ```
 
 `RERANK_METHOD` options:
-- `standard`: uses SIE `score(...)` on review texts
-- `custom`: uses generated tasting notes + review embeddings + cosine similarity
 
-`RERANK_ALPHA` mixes the user query vector with the averaged reference-wine vector.
+- `standard`: uses the SIE reranker on candidate review text
+- `custom`: uses generated tasting notes, review embeddings, and cosine similarity
+
+`RERANK_ALPHA` mixes the user query embedding with the averaged reference-wine embedding.
+
 `CUSTOM_RERANK_A` mixes review embeddings with generated tasting-note embeddings for each wine.
-
-User preferences are expected to come from the UI already normalized. The engine assumes:
-- `structure` contains `acidity`, `fizziness`, `intensity`, `sweetness`, and `tannin`
-- all structure and flavor values are numeric floats on the normalized 0-1 scale
-- `flavors` is a mapping of flavor name to normalized weight
 
 ## Run
 
-Run the prototype:
+This folder is mainly the retrieval prototype code used by the root app, so the most direct way to use it in the full demo is still through the root backend.
+
+If you want to inspect or compare the retrieval logic directly, run the evaluation scripts from the repo root:
 
 ```bash
-python main.py
-```
-
-## Tests
-
-Compare the two rerank methods on the same candidate set:
-
-```bash
+python test/eval_queries.py
 python test/compare_rerank_methods.py
 ```
 
-## Flow
-1. Fetch wines from Vivino
-2. Fetch reviews for retrieved wines
-3. Build wine vectors from structure + flavors
-4. Retrieve top candidates with cosine similarity
-5. Rerank with either:
-   - standard SIE reranker
-   - custom embedding reranker
+## Retrieval Flow
+
+1. Fetch wines from Vivino or load from the local database
+2. Build wine vectors from structure + flavors
+3. Retrieve top candidates with cosine similarity
+4. Rerank candidates with standard SIE reranking (with the [score](https://sie.dev/docs/score) method) or custom embedding-based reranking (with the [encode](https://sie.dev/docs/encode) method)

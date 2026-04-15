@@ -75,7 +75,9 @@ def generate_user_preferences_note(user_preferences):
 
     structure_parts = []
     for structure_name, structure_value in user_structure.items():
-        structure_parts.append(f"{_structure_label(float(structure_value))} {structure_name}")
+        structure_parts.append(
+            f"{_structure_label(float(structure_value))} {structure_name}"
+        )
 
     structure_text = ", ".join(structure_parts)
     if flavor_parts:
@@ -110,7 +112,9 @@ class EmbeddingGenerator:
         if not texts:
             return np.empty((0, self.sample_embedding_dim), dtype=np.float32)
 
-        items = [{"id": f"item-{index}", "text": text} for index, text in enumerate(texts)]
+        items = [
+            {"id": f"item-{index}", "text": text} for index, text in enumerate(texts)
+        ]
         results = self.client.encode(
             self.model_name,
             items,
@@ -141,8 +145,12 @@ def generate_wine_embeddings(embedding_generator, wines_df):
         review_counts_per_wine[local_index] = len(reviews)
         all_review_texts.extend(reviews)
 
-    batch_review_embeddings = embedding_generator._get_embeddings_batch(all_review_texts)
-    batch_tasting_note_embeddings = embedding_generator._get_embeddings_batch(wines_df["tasting_notes"].tolist())
+    batch_review_embeddings = embedding_generator._get_embeddings_batch(
+        all_review_texts
+    )
+    batch_tasting_note_embeddings = embedding_generator._get_embeddings_batch(
+        wines_df["tasting_notes"].tolist()
+    )
 
     wines_df["review_embedding"] = None
     wines_df["tasting_note_embedding"] = None
@@ -153,16 +161,21 @@ def generate_wine_embeddings(embedding_generator, wines_df):
         review_count = review_counts_per_wine[local_index]
         if review_count > 0:
             wine_review_embeddings = batch_review_embeddings[
-                current_review_embedding_index: current_review_embedding_index + review_count
+                current_review_embedding_index : current_review_embedding_index
+                + review_count
             ]
-            wines_df.at[wine_index, "review_embedding"] = np.mean(wine_review_embeddings, axis=0)
+            wines_df.at[wine_index, "review_embedding"] = np.mean(
+                wine_review_embeddings, axis=0
+            )
             current_review_embedding_index += review_count
         else:
             wines_df.at[wine_index, "review_embedding"] = np.zeros(
                 embedding_generator.sample_embedding_dim, dtype=np.float32
             )
 
-        wines_df.at[wine_index, "tasting_note_embedding"] = batch_tasting_note_embeddings[local_index]
+        wines_df.at[wine_index, "tasting_note_embedding"] = (
+            batch_tasting_note_embeddings[local_index]
+        )
 
     return wines_df
 
@@ -176,7 +189,9 @@ def combine_wine_embeddings(embedding_generator, wines_df):
             wine_row["review_embedding"],
             wine_row["tasting_note_embedding"],
         )
-        wines_df.at[wines_df.index[local_index], "combined_embedding"] = combined_embedding
+        wines_df.at[wines_df.index[local_index], "combined_embedding"] = (
+            combined_embedding
+        )
 
     return wines_df
 
@@ -191,10 +206,7 @@ def build_final_query_embedding(user_query_embedding, reference_embeddings, alph
     else:
         average_reference_embedding = np.zeros_like(user_query_embedding)
 
-    return (
-        alpha * user_query_embedding
-        + (1.0 - alpha) * average_reference_embedding
-    )
+    return alpha * user_query_embedding + (1.0 - alpha) * average_reference_embedding
 
 
 def rerank_wines_with_custom_embeddings(
@@ -206,6 +218,7 @@ def rerank_wines_with_custom_embeddings(
     base_url=None,
     model_name=None,
     gpu=None,
+    provision_timeout_s=900,
     a=None,
     alpha=None,
     no_review_penalty=0.5,
@@ -224,33 +237,54 @@ def rerank_wines_with_custom_embeddings(
         [{"id": "sample", "text": "sample"}],
         gpu=gpu,
         wait_for_capacity=True,
-        provision_timeout_s=900,
+        provision_timeout_s=provision_timeout_s,
     )[0]["dense"]
     embedding_generator = EmbeddingGenerator(
         client,
         len(sample_embedding),
         model_name,
         gpu=gpu,
+        provision_timeout_s=provision_timeout_s,
         a=a,
     )
 
     candidate_wines = wines.iloc[candidate_row_indices].copy()
-    candidate_wines["tasting_notes"] = candidate_wines.apply(generate_tasting_note, axis=1)
-    candidate_wines["wine_reviews_normalized"] = candidate_wines.apply(pull_wine_reviews, axis=1)
+    candidate_wines["tasting_notes"] = candidate_wines.apply(
+        generate_tasting_note, axis=1
+    )
+    candidate_wines["wine_reviews_normalized"] = candidate_wines.apply(
+        pull_wine_reviews, axis=1
+    )
     candidate_wines = generate_wine_embeddings(embedding_generator, candidate_wines)
     candidate_wines = combine_wine_embeddings(embedding_generator, candidate_wines)
+
+    # The no-review penalty is meant to bias the ranking toward wines that
+    # actually have reviews to match against. If none of the candidates have
+    # reviews (e.g. running against the bundled SQLite catalog), applying the
+    # penalty to every wine just uniformly scales every score without changing
+    # the relative ranking, so we skip it in that case to preserve signal.
+    any_candidate_has_reviews = any(
+        len(candidate_wines.iloc[local_index]["wine_reviews_normalized"]) > 0
+        for local_index in range(len(candidate_wines))
+    )
 
     reference_embeddings = []
     if reference_row_indices:
         reference_wines = wines.iloc[reference_row_indices].copy()
-        reference_wines["tasting_notes"] = reference_wines.apply(generate_tasting_note, axis=1)
-        reference_wines["wine_reviews_normalized"] = reference_wines.apply(pull_wine_reviews, axis=1)
+        reference_wines["tasting_notes"] = reference_wines.apply(
+            generate_tasting_note, axis=1
+        )
+        reference_wines["wine_reviews_normalized"] = reference_wines.apply(
+            pull_wine_reviews, axis=1
+        )
         reference_wines = generate_wine_embeddings(embedding_generator, reference_wines)
         reference_wines = combine_wine_embeddings(embedding_generator, reference_wines)
         reference_embeddings = reference_wines["combined_embedding"].tolist()
 
     user_query_text = generate_user_preferences_note(user_preferences)
-    user_query_embedding = generate_user_query_embedding(embedding_generator, user_query_text)
+    user_query_embedding = generate_user_query_embedding(
+        embedding_generator, user_query_text
+    )
     final_query_embedding = build_final_query_embedding(
         user_query_embedding,
         reference_embeddings,
@@ -261,9 +295,13 @@ def rerank_wines_with_custom_embeddings(
     for local_index, row_index in enumerate(candidate_row_indices):
         combined_wine_vector = candidate_wines.iloc[local_index]["combined_embedding"]
 
-        score = float(cosine_similarity([final_query_embedding], [combined_wine_vector])[0][0])
+        score = float(
+            cosine_similarity([final_query_embedding], [combined_wine_vector])[0][0]
+        )
         review_count = len(candidate_wines.iloc[local_index]["wine_reviews_normalized"])
-        if np.all(candidate_wines.iloc[local_index]["review_embedding"] == 0):
+        if any_candidate_has_reviews and np.all(
+            candidate_wines.iloc[local_index]["review_embedding"] == 0
+        ):
             score *= float(no_review_penalty)
 
         wine_scores.append(
@@ -274,7 +312,9 @@ def rerank_wines_with_custom_embeddings(
             }
         )
 
-    ranked_wines = sorted(wine_scores, key=lambda item: item["rerank_score"], reverse=True)
+    ranked_wines = sorted(
+        wine_scores, key=lambda item: item["rerank_score"], reverse=True
+    )
     for rank, wine_score in enumerate(ranked_wines):
         wine_score["rerank_rank"] = rank
         wine_score["query_vector_length"] = int(len(final_query_embedding))

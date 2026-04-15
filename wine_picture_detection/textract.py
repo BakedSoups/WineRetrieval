@@ -1,3 +1,36 @@
+<<<<<<< HEAD
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import sqlite3
+from pathlib import Path
+from typing import Any
+from rapidfuzz import fuzz
+import cv2
+
+import numpy as np
+from dotenv import load_dotenv
+from PIL import Image
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+PACKAGE_DIR = Path(__file__).resolve().parent
+
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv(PACKAGE_DIR / ".env", override=True)
+
+_database_path_value = os.getenv("DATABASE_PATH", "wine_flavor.db")
+DATABASE_PATH = Path(_database_path_value)
+if not DATABASE_PATH.is_absolute():
+    DATABASE_PATH = ROOT_DIR / DATABASE_PATH
+
+CLUSTER_URL = os.getenv("CLUSTER_URL")
+API_KEY = os.getenv("API_KEY")
+TOP_N = int(os.getenv("TOP_N", 5))
+SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 0))
+SIE_OCR_MODEL = os.getenv("SIE_OCR_MODEL", "microsoft/Florence-2-base")
+=======
 """Extract text from a wine label and fuzzy match against database"""
 
 import math
@@ -25,10 +58,19 @@ GPU = os.getenv("GPU", "l4-spot")
 PROVISION_TIMEOUT_S = int(os.getenv("PROVISION_TIMEOUT_S", 900))
 DB_FIELDS = ["wine_name", "winery_name", "region_name", "country_name"]
 
+>>>>>>> main
 ALLOWED_OCR_MODELS = {
     "microsoft/Florence-2-base",
     "microsoft/Florence-2-large",
 }
+<<<<<<< HEAD
+OCR_GPU = os.getenv("OCR_GPU", "l4-spot")
+OCR_WAIT_FOR_CAPACITY = True
+OCR_PROVISION_TIMEOUT_S = int(os.getenv("OCR_PROVISION_TIMEOUT_S", 900))
+DB_FIELDS = {"wine_name": 1.0, "winery_name": 1.0}  # can change field weights here
+DB_BONUS_FIELDS = ["region_name", "country_name"]
+=======
+>>>>>>> main
 
 # Image quality check >>>
 
@@ -85,6 +127,28 @@ def check_quality(image: Image.Image) -> dict:
 
 # Image quality check <<<
 
+<<<<<<< HEAD
+# Text Extraction >>>
+
+
+def _require_sie_sdk():
+    from sie_sdk import Item, SIEClient
+
+    return SIEClient, Item
+
+
+def textract(image: Image.Image) -> dict[str, Any]:
+    SIE_CLIENT, Item = _require_sie_sdk()
+    sie_client = SIE_CLIENT(CLUSTER_URL, api_key=API_KEY)
+
+    return sie_client.extract(
+        SIE_OCR_MODEL,
+        Item(images=[{"data": image, "format": "png"}]),
+        options={"task": "<OCR_WITH_REGION>"},
+        gpu=OCR_GPU,
+        wait_for_capacity=OCR_WAIT_FOR_CAPACITY,
+        provision_timeout_s=OCR_PROVISION_TIMEOUT_S,
+=======
 # Image Preprocessing >>>
 
 
@@ -180,6 +244,7 @@ def textract(image: Image.Image):
         gpu=GPU,
         wait_for_capacity=True,
         provision_timeout_s=PROVISION_TIMEOUT_S,
+>>>>>>> main
     )
 
 
@@ -190,8 +255,17 @@ def textract(image: Image.Image):
 
 def extract_blob(label_data: dict) -> str:
     """Join all entity texts into one string, stripping XML artifacts."""
+<<<<<<< HEAD
+    cleaned = (
+        re.sub(r"</?\w+>", "", e["text"]).strip()
+        for e in label_data.get("entities", [])
+        if e.get("text")
+    )
+    return " ".join(t for t in cleaned if t)
+=======
     raw = " ".join(e["text"] for e in label_data.get("entities", []) if e.get("text"))
     return re.sub(r"</?\w+>", "", raw).strip()
+>>>>>>> main
 
 
 def extract_vintage(blob: str) -> str | None:
@@ -210,8 +284,13 @@ def fetch_wines(db_path: str, vintage: str | None) -> list[dict]:
         cursor.execute(
             """
             SELECT wine_id, winery_name, wine_name, vintage_year,
+<<<<<<< HEAD
+                   rating_average, ratings_count, country_name, region_name
+            FROM wines WHERE vintage_year = ? OR vintage_year IS NULL
+=======
                    rating_average, rating_count, country_name, region_name
             FROM wines WHERE vintage_year = ?
+>>>>>>> main
         """,
             (vintage,),
         )
@@ -229,11 +308,104 @@ def fetch_wines(db_path: str, vintage: str | None) -> list[dict]:
     return rows
 
 
+<<<<<<< HEAD
+def _normalize_separators(text: str):
+    """Helps _field_score to ensure db fields are separated by spaces"""
+    return text.lower().replace("-", " ")
+
+
+=======
+>>>>>>> main
 def _field_score(query: str, target: str) -> float:
     """
     Score query against target. Rewards full word matches over partial overlap.
     Combines fuzzy ratio (handles OCR noise) with word coverage (penalizes missing words).
     """
+<<<<<<< HEAD
+
+    query = _normalize_separators(query)
+    target = _normalize_separators(target)
+
+    query_tokens = set(query.lower().split())
+    target_tokens = set(target.lower().split())
+
+    # Combination of the intersection + union penalizes both missing and extra words
+    coverage = len(query_tokens & target_tokens) / len(query_tokens | target_tokens)
+
+    # token_set_ratio scores the shared token intersection against each remainder
+    ## better handles prefix noise from OCR adding extra words
+    set_fuzzy_score = fuzz.token_set_ratio(query, target)
+
+    # 60% coverage, 40% fuzzy — adjust if OCR quality is poor
+    return (set_fuzzy_score * 0.4) + (coverage * 100 * 0.6)
+
+
+def _subsequences(entity: str) -> list[str]:
+    """Helps score_wine to generate all contiguous token sub-sequences of an entity string."""
+    tokens = entity.split()
+    return [
+        " ".join(tokens[start:end])
+        for start in range(len(tokens))
+        for end in range(start + 1, len(tokens) + 1)
+    ]
+
+
+def score_wine(wine: dict, entities: list[str]) -> float:
+    """
+    For each entity, take its best sub-sequence score across all DB fields, then average across entities.
+    Vintage and field matches scored separately as additive bonuses.
+    """
+
+    FIELD_BONUS = 0.0  # TODO: add to .env
+
+    entity_scores = [
+        max(
+            _field_score(candidate, str(wine.get(field) or "")) * weight
+            for field, weight in DB_FIELDS.items()
+            # score all sub-sequences and take the best
+            ## handles OCR bundling extra words
+            for candidate in _subsequences(entity)
+        )
+        for entity in entities
+    ]
+
+    # small additive bonus if any entity matches a geographic field
+    field_bonus = (
+        FIELD_BONUS
+        if any(
+            _field_score(entity, str(wine.get(field) or "")) > 80
+            for entity in entities
+            for field in DB_BONUS_FIELDS
+        )
+        else 0.0
+    )
+
+    VINTAGE_BONUS = 0.0  # TODO: add to .env
+
+    # The average of the per-entity scores
+    ## how well the OCR text matched the wine's fields.
+    average_field_match_score = (
+        sum(entity_scores) / len(entity_scores) if entity_scores else 0.0
+    )
+
+    # add vintage bonus
+    vintage_bonus = (
+        VINTAGE_BONUS
+        if (
+            wine.get("vintage_year")  # Guard against null
+            and any(entity == str(wine["vintage_year"]) for entity in entities)
+        )
+        else 0.0
+    )
+
+    # only using average_field_match_score for now (scores better)
+    return average_field_match_score + vintage_bonus + field_bonus
+
+
+def match_label(label_data: dict, top_n: int = TOP_N) -> list[dict]:
+    """
+    Match a raw label extraction dict against the wine database.
+=======
     query_tokens = set(query.lower().split())
     target_tokens = set(target.lower().split())
 
@@ -268,6 +440,7 @@ def score_wine(wine: dict, entities: list[str]) -> float:
 def match_label(label_data: dict, top_n: int = TOP_N) -> list[dict]:
     """Match a raw label extraction dict against the wine database.
 
+>>>>>>> main
     Returns a list of up to top_n wine dicts sorted by match_score descending,
     each containing: wine_id, winery_name, wine_name, vintage_year,
     rating_average, rating_count, country_name, region_name, match_score (0-100).
@@ -279,9 +452,16 @@ def match_label(label_data: dict, top_n: int = TOP_N) -> list[dict]:
         return []
 
     vintage = extract_vintage(blob)
+<<<<<<< HEAD
+
+    # Strip XML artifacts (e.g. </s>) leaked by the OCR model before scoring
+    entities = [
+        re.sub(r"</?\w+>", "", e["text"]).strip().lower()
+=======
     # Each entity is a separate matching unit against all DB fields
     entities = [
         e["text"].strip().lower()
+>>>>>>> main
         for e in label_data.get("entities", [])
         if e.get("text")
     ]
@@ -296,6 +476,69 @@ def match_label(label_data: dict, top_n: int = TOP_N) -> list[dict]:
     return [wine for wine in scored if wine["match_score"] >= SCORE_THRESHOLD][:top_n]
 
 
+<<<<<<< HEAD
+def extract_and_match_image(
+    image: Image.Image, top_n: int = TOP_N
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    extracted = textract(image)
+    matches = match_label(extracted, top_n=top_n)
+    return extracted, matches
+
+
+# Fuzzy Match <<<
+
+# DEBUG >>>
+
+
+def debug_ranking(matched_labels: list[dict], target: str) -> None:
+
+    rank = 0
+
+    for dictionary in matched_labels:
+        if dictionary["wine_name"] == target:
+            print(f"Wine found (ranked {rank}th):\n{dictionary}\n")
+            return
+
+        rank += 1
+
+    print(f"failed to find {target}")
+
+
+# DEBUG <<<
+
+
+def main():
+    if SIE_OCR_MODEL not in ALLOWED_OCR_MODELS:
+        raise ValueError(
+            f"SIE_OCR_MODEL '{SIE_OCR_MODEL}' not in ALLOWED_OCR_MODELS: {ALLOWED_OCR_MODELS}"
+        )
+
+    parser = argparse.ArgumentParser(description="Run OCR against a wine label image.")
+    parser.add_argument(
+        "image",
+        nargs="?",
+        default=str(PACKAGE_DIR / "wine_test.webp"),
+        help="Path to the image to OCR. Defaults to wine_picture_detection/wine_test.webp",
+    )
+    parser.add_argument(
+        "--top-n",
+        type=int,
+        default=TOP_N,
+        help="Number of fuzzy-match results to print.",
+    )
+    args = parser.parse_args()
+
+    image_path = Path(args.image)
+    print(f"Image: {image_path}")
+    if not image_path.exists():
+        raise FileNotFoundError(f"Image not found: {image_path}")
+
+    wine_label = Image.open(image_path)
+    wine_label.load()
+    print(
+        f"Loaded: format={wine_label.format} mode={wine_label.mode} size={wine_label.size}"
+    )
+=======
 # Fuzzy Match <<<
 
 
@@ -311,11 +554,28 @@ def main():
     wine_label = Image.open("wine_test.png")
     wine_label.show()
     print("\nLoaded image")
+>>>>>>> main
 
     # Check image quality
     image_quality = check_quality(wine_label)
     print(f"\nImage quality:\n{image_quality}")
 
+<<<<<<< HEAD
+    # Extract text and fuzzy match with known wines
+    extracted_text, matched_labels = extract_and_match_image(
+        wine_label, top_n=args.top_n
+    )
+    print(f"\nOCR output:\n{extracted_text}\n")
+    # print(f"\nMatched Labels:")
+    # [print(dictionary) for dictionary in matched_labels] # DEBUG
+
+    print(f"\nTop {args.top_n} matches:")
+    for match in matched_labels:
+        print(match)
+
+    # Debug wine ranking by score
+    # debug_ranking(matched_labels, "walker-hill-vineyard-chardonnay")
+=======
     # Preprocess Image
     # preprocessed_label = preprocess(wine_label)
     # preprocessed_label.show()
@@ -344,6 +604,7 @@ def main():
         tries += 1
     
     DEBUG <<< """
+>>>>>>> main
 
 
 if __name__ == "__main__":
