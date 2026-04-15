@@ -73,11 +73,11 @@ You can get these either by:
 
 Background on the SIE primitives this demo uses:
 
-- [`encode`](https://sie.dev/docs/encode) for tasting-note and review embeddings in the **embedding-based reranker** (config value `custom`)
-- [`score`](https://sie.dev/docs/score) for cross-encoder reranking of candidate reviews in the **cross-encoder reranker** (config value `standard`)
-- [`extract`](https://sie.dev/docs/extract) - OCR-style extraction on wine label images
+- [`encode`](https://sie.dev/docs/encode) for tasting note and review embeddings in the **embedding-based reranker** (config value `custom`)
+- [`score`](https://sie.dev/docs/score) for cross-encoder reranking of candidate wines in the **cross-encoder reranker** (config value `standard`)
+- [`extract`](https://sie.dev/docs/extract) for OCR-based extraction on wine label images
 
-Retrieval itself (the first stage that narrows 5k+ wines down to a candidate set) runs locally with a TF-IDF cosine over structured flavor and taste attributes, so the first-stage retrieval does not call SIE. SIE engages at the reranking and extraction stages.
+Retrieval itself (the first stage that narrows 5k+ wines down to a candidate set) runs locally with a TF-IDF cosine scoring over structured flavor and taste attributes, so the first-stage retrieval does not call SIE. SIE engages at the reranking and extraction stages.
 
 ### Docker and Docker Compose
 
@@ -122,7 +122,7 @@ If you are running the full demo, put the required backend keys in the root `.en
 The recommendation flow supports two reranking strategies, selected via `RERANK_METHOD` in `.env`. Both re-order the top-20 candidates produced by the local TF-IDF retrieval stage, but they call SIE in different ways:
 
 - **`custom` (embedding-based reranker, default)**: calls SIE [`encode`](https://sie.dev/docs/encode) on generated tasting notes and (when available) per-wine reviews, embeds the user query the same way, then ranks candidates by cosine similarity in the shared embedding space. Works out of the box with the bundled SQLite catalog, which has structured taste and flavor attributes but no per-wine reviews. The code calls this path `custom_rerank` and the config value is `custom`; in the retrieval literature this is more precisely an embedding-based reranker or a dense re-scoring pass.
-- **`standard` (cross-encoder reranker)**: calls SIE [`score`](https://sie.dev/docs/score) to rerank each candidate wine's reviews against a set of structure and flavor prompt terms, with each `(term, review)` pair scored by a cross-encoder model such as `BAAI/bge-reranker-v2-m3`. This mode only produces meaningful scores when wines actually have reviews - the bundled catalog ships without reviews, so every wine will get a zero rerank score in `standard` mode. If you want to try `standard` mode, re-run the database ingestion under `wine_flavor/db_creation.py` to fetch reviews from Vivino first.
+- **`standard` (cross-encoder reranker)**: calls SIE [`score`](https://sie.dev/docs/score) to rerank each candidate wine's reviews against a set of structure and flavor prompt terms, with each `(term, review)` pair scored by a cross-encoder model such as `BAAI/bge-reranker-v2-m3`. This mode only produces meaningful scores when wines actually have reviews - the bundled SQLite catalog ships without reviews, so every wine will get a zero rerank score in `standard` mode. If you want to try `standard` mode, re-run the database ingestion under `wine_flavor/db_creation.py` to fetch reviews from Vivino first.
 
 ## What To Try
 
