@@ -110,7 +110,7 @@ class DemoCatalog:
         self.wines = None
         self.unique_flavors = None
         self.flavor_idf = None
-        self.wine_matrix = None
+        self.chroma_store = None
 
     def _load_from_sqlite(self):
         if not DB_PATH.exists():
@@ -179,7 +179,7 @@ class DemoCatalog:
             self.wines = wines
             self.unique_flavors = catalog_assets["unique_flavors"]
             self.flavor_idf = catalog_assets["flavor_idf"]
-            self.wine_matrix = catalog_assets["wine_matrix"]
+            self.chroma_store = catalog_assets["chroma_store"]
             self._loaded = True
 
 
@@ -405,7 +405,7 @@ def recommendations(payload: RecommendationRequest):
             catalog.wines,
             catalog.unique_flavors,
             catalog.flavor_idf,
-            catalog.wine_matrix,
+            catalog.chroma_store,
             user_preferences,
             top_k=payload.top_k,
             reference_row_indices=payload.reference_row_indices,
@@ -469,6 +469,7 @@ def reload_catalog():
         "status": "reloaded",
         "wine_count": len(catalog.wines),
         "flavor_count": len(catalog.unique_flavors),
+        "chroma_wine_vectors": catalog.chroma_store.wine_count() if catalog.chroma_store else 0,
     }
 
 
