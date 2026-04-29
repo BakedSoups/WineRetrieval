@@ -1,16 +1,27 @@
+import logging
+
 import pandas as pd
 
 from . import engine, pretty_print, transforms
+
+log = logging.getLogger(__name__)
 
 
 def load_catalog_assets(wines):
     unique_flavors = transforms.unique_flavors(wines)
     flavor_idf = engine.build_flavor_idf(wines)
-    wine_matrix = engine.build_wine_matrix(wines, unique_flavors, flavor_idf)
+
+    chroma_store = engine.ChromaWineStore()
+    if not chroma_store.is_populated():
+        log.info("ChromaDB is empty — seeding from catalog (%d wines)…", len(wines))
+        chroma_store.ingest_wines(wines, unique_flavors, flavor_idf)
+    else:
+        log.info("ChromaDB already populated (%d wine vectors)", chroma_store.wine_count())
+
     return {
         "unique_flavors": unique_flavors,
         "flavor_idf": flavor_idf,
-        "wine_matrix": wine_matrix,
+        "chroma_store": chroma_store,
     }
 
 
@@ -150,7 +161,7 @@ def get_recommendations(
     wines,
     unique_flavors,
     flavor_idf,
-    wine_matrix,
+    chroma_store,
     user_preferences,
     *,
     top_k,
@@ -166,8 +177,21 @@ def get_recommendations(
     custom_rerank_no_review_penalty,
     rerank_max_terms,
 ):
+    import uuid
+
     user_vector = engine.build_user_vector(user_preferences, unique_flavors, flavor_idf)
-    top_matches = engine.cosine_similarity_search(user_vector, wine_matrix, top_k=top_k)
+
+    chroma_store.store_query(
+        str(uuid.uuid4()),
+        user_vector,
+        metadata={
+            "top_k": top_k,
+            "rerank_method": rerank_method,
+            **{f"structure_{k}": float(v) for k, v in user_preferences["structure"].items()},
+        },
+    )
+
+    top_matches = chroma_store.search_wines(user_vector, top_k=top_k)
     candidate_row_indices = [match["row_index"] for match in top_matches]
 
     if rerank_method == "custom":
