@@ -17,6 +17,7 @@ x-airflow-common: &airflow-common
   volumes:
     - ./dags:/opt/airflow/dags
     - ./wine_flavor:/opt/airflow/wine_flavor
+    - ./db:/opt/airflow/db
     - airflow_logs:/opt/airflow/logs
   depends_on:
     postgres:
