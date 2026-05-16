@@ -63,32 +63,59 @@ def fetch_vivino_wines(price_range_min=0, price_range_max=1000, page=1, num_page
                 })
 
             all_wines.append({
+                # Identifiers
                 "wine_id": wine.get("id"),
-                "winery_name": winery.get("seo_name"),
-                "wine_name": wine.get("seo_name"),
+
+                # Winery: name (display) + seo_name
+                "winery_name": winery.get("name"),
+                "winery_seo_name": winery.get("seo_name"),
+
+                # Wine: name (display) + seo_name
+                "wine_name": wine.get("name"),
+                "wine_seo_name": wine.get("seo_name"),
+
+                # Vintage
+                "vintage_name": vintage.get("name"),
+                "vintage_seo_name": vintage.get("seo_name"),
                 "vintage_year": vintage.get("year"),
                 "rating_average": vintage_stats.get("ratings_average"),
                 "ratings_count": vintage_stats.get("ratings_count"),
+
+                # Geography
                 "country_name": country.get("name"),
+                "country_seo_name": country.get("seo_name"),
+                "country_code": country.get("code"),
                 "region_name": region.get("name"),
+                "region_seo_name": region.get("seo_name"),
+
+                # Wine attributes
                 "is_natural": wine.get("is_natural"),
                 "wine_type_id": wine.get("type_id"),
+
+                # Taste structure
                 "taste_acidity": structure.get("acidity"),
                 "taste_fizziness": structure.get("fizziness"),
                 "taste_intensity": structure.get("intensity"),
                 "taste_sweetness": structure.get("sweetness"),
                 "taste_tannin": structure.get("tannin"),
+
+                # Flavors
                 "wine_flavors": wine_flavors,
+
+                # Style
                 "style_id": style.get("id"),
                 "style_name": style.get("name"),
+                "style_seo_name": style.get("seo_name"),
                 "style_varietal_name": style.get("varietal_name"),
                 "style_body_description": style.get("body"),
                 "style_acidity_description": style.get("acidity"),
                 "style_description": style.get("description"),
                 "style_food_pairings": food_pairings,
                 "style_grapes_composition": grapes_composition,
+
+                # Price
                 "price_amount": price.get("amount"),
-                "price_currency": currency.get("code")
+                "price_currency": currency.get("code"),
             })
 
     return pd.DataFrame(all_wines)

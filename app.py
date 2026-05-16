@@ -10,11 +10,20 @@ import pandas as pd
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile
-from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+
 from wine_flavor import datasource, service
 from wine_picture_detection import detect_wine_from_image_bytes
+
+from schemas import (
+    CatalogResponse,
+    DetectedWineResponse,
+    HealthResponse,
+    RecommendationRequest,
+    RecommendationsResponse,
+    ReloadResponse,
+    RootResponse,
+)
 
 load_dotenv()
 
@@ -88,20 +97,6 @@ if SIE_RERANK_MODEL not in ALLOWED_SIE_RERANK_MODELS:
     )
 
 
-class StructurePreferences(BaseModel):
-    acidity: float = Field(ge=0.0, le=1.0)
-    fizziness: float = Field(ge=0.0, le=1.0)
-    intensity: float = Field(ge=0.0, le=1.0)
-    sweetness: float = Field(ge=0.0, le=1.0)
-    tannin: float = Field(ge=0.0, le=1.0)
-
-
-class RecommendationRequest(BaseModel):
-    structure: StructurePreferences
-    flavors: dict[str, float] = Field(default_factory=dict)
-    reference_row_indices: list[int] = Field(default_factory=list)
-    top_k: int = Field(default=COSINE_TOP_K, ge=1, le=50)
-
 
 class DemoCatalog:
     def __init__(self):
@@ -110,7 +105,7 @@ class DemoCatalog:
         self.wines = None
         self.unique_flavors = None
         self.flavor_idf = None
-        self.wine_matrix = None
+        self.chroma_store = None
 
     def _load_from_sqlite(self):
         if not DB_PATH.exists():
@@ -179,7 +174,7 @@ class DemoCatalog:
             self.wines = wines
             self.unique_flavors = catalog_assets["unique_flavors"]
             self.flavor_idf = catalog_assets["flavor_idf"]
-            self.wine_matrix = catalog_assets["wine_matrix"]
+            self.chroma_store = catalog_assets["chroma_store"]
             self._loaded = True
 
 
@@ -370,7 +365,7 @@ app.add_middleware(
 )
 
 
-@app.get("/")
+@app.get("/", response_model=RootResponse)
 def root():
     return {
         "name": "Wine Flavor Demo API",
@@ -380,7 +375,7 @@ def root():
     }
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse)
 def health():
     return {
         "status": "ok",
@@ -390,40 +385,38 @@ def health():
     }
 
 
-@app.get("/catalog")
+@app.get("/catalog", response_model=CatalogResponse)
 def catalog_view():
     catalog.load()
-    return jsonable_encoder(service.build_catalog_response(catalog.wines))
+    return service.build_catalog_response(catalog.wines)
 
 
-@app.post("/recommendations")
+@app.post("/recommendations", response_model=RecommendationsResponse)
 def recommendations(payload: RecommendationRequest):
     catalog.load()
     user_preferences = _request_to_preferences(payload)
-    return jsonable_encoder(
-        service.get_recommendations(
-            catalog.wines,
-            catalog.unique_flavors,
-            catalog.flavor_idf,
-            catalog.wine_matrix,
-            user_preferences,
-            top_k=payload.top_k,
-            reference_row_indices=payload.reference_row_indices,
-            rerank_method=RERANK_METHOD,
-            base_url=SIE_BASE_URL,
-            rerank_model=SIE_RERANK_MODEL,
-            embedding_model=SIE_EMBEDDING_MODEL,
-            gpu=SIE_GPU,
-            provision_timeout_s=SIE_PROVISION_TIMEOUT_S,
-            rerank_alpha=RERANK_ALPHA,
-            custom_rerank_a=CUSTOM_RERANK_A,
-            custom_rerank_no_review_penalty=CUSTOM_RERANK_NO_REVIEW_PENALTY,
-            rerank_max_terms=RERANK_MAX_TERMS,
-        )
+    return service.get_recommendations(
+        catalog.wines,
+        catalog.unique_flavors,
+        catalog.flavor_idf,
+        catalog.chroma_store,
+        user_preferences,
+        top_k=payload.top_k,
+        reference_row_indices=payload.reference_row_indices,
+        rerank_method=RERANK_METHOD,
+        base_url=SIE_BASE_URL,
+        rerank_model=SIE_RERANK_MODEL,
+        embedding_model=SIE_EMBEDDING_MODEL,
+        gpu=SIE_GPU,
+        provision_timeout_s=SIE_PROVISION_TIMEOUT_S,
+        rerank_alpha=RERANK_ALPHA,
+        custom_rerank_a=CUSTOM_RERANK_A,
+        custom_rerank_no_review_penalty=CUSTOM_RERANK_NO_REVIEW_PENALTY,
+        rerank_max_terms=RERANK_MAX_TERMS,
     )
 
 
-@app.post("/detect-wine-image")
+@app.post("/detect-wine-image", response_model=DetectedWineResponse)
 async def detect_wine_image(file: UploadFile = File(...)):
     catalog.load()
 
@@ -453,22 +446,21 @@ async def detect_wine_image(file: UploadFile = File(...)):
     detection = detect_wine_from_image_bytes(image_bytes)
     detected_wine = _select_detected_wine_record(catalog.wines, detection.wine_id)
 
-    return jsonable_encoder(
-        {
-            "detected_wine": detected_wine,
-            "match_score": detection.match_score,
-            "ocr_text": detection.ocr_text,
-        }
-    )
+    return {
+        "detected_wine": detected_wine,
+        "match_score": detection.match_score,
+        "ocr_text": detection.ocr_text,
+    }
 
 
-@app.post("/reload")
+@app.post("/reload", response_model=ReloadResponse)
 def reload_catalog():
     catalog.load(force=True)
     return {
         "status": "reloaded",
         "wine_count": len(catalog.wines),
         "flavor_count": len(catalog.unique_flavors),
+        "chroma_wine_vectors": catalog.chroma_store.wine_count() if catalog.chroma_store else 0,
     }
 
 

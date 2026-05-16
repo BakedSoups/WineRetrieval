@@ -1,4 +1,102 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Common Airflow environment block — referenced by all Airflow services.
+# ─────────────────────────────────────────────────────────────────────────────
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.3
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+    # Make wine_flavor importable inside the DAG
+    PYTHONPATH: /opt/airflow
+    # wine_db Airflow connection for the ingestion pipeline
+    AIRFLOW_CONN_WINE_DB: >-
+      postgresql://wine_user:wine_password@postgres:5432/WineAI
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./wine_flavor:/opt/airflow/wine_flavor
+    - ./db:/opt/airflow/db
+    - airflow_logs:/opt/airflow/logs
+  depends_on:
+    postgres:
+      condition: service_healthy
+  restart: unless-stopped
+
+
 services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  # Hosts two databases:
+  #   WineAI  — wine catalog data (schema in docker/postgres/02_wine_schema.sql)
+  #   airflow — Airflow metadata  (created in docker/postgres/01_create_airflow_db.sql)
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: wine_user
+      POSTGRES_PASSWORD: wine_password
+      POSTGRES_DB: WineAI
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/01_create_airflow_db.sql:/docker-entrypoint-initdb.d/01_create_airflow_db.sql
+      - ./docker/postgres/02_wine_schema.sql:/docker-entrypoint-initdb.d/02_wine_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wine_user -d WineAI"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ── Airflow init ────────────────────────────────────────────────────────────
+  # One-shot container: migrates the Airflow metadata DB and creates the admin user.
+  # Subsequent starts are no-ops once migrations are current.
+  airflow-init:
+    <<: *airflow-common
+    restart: "no"
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate && \
+        airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com
+
+  # ── Airflow webserver ───────────────────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    ports:
+      - "8080:8080"
+    command: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ── Airflow scheduler ───────────────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ── FastAPI backend ─────────────────────────────────────────────────────────
   backend:
     build:
       context: .
@@ -9,8 +107,13 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+      - chroma_data:/app/chroma_data
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
+  # ── Next.js frontend ────────────────────────────────────────────────────────
   frontend:
     build:
       context: ./app
@@ -28,6 +131,10 @@ services:
       - frontend_next:/app/.next
     restart: unless-stopped
 
+
 volumes:
+  postgres_data:
+  airflow_logs:
+  chroma_data:
   frontend_node_modules:
   frontend_next:
